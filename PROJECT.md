@@ -135,6 +135,7 @@ cargo test --workspace
 | 2026-08-15 | NL is a **clarify-then-plan agent** (desire + priority, ≤3 clarify rounds), **local or online**: Grok default, any OpenAI-compatible localhost (Ollama/LM Studio). Online sees a redacted catalog digest unless `nl.send_paths`. Source: `docs/brainstorm.md`. |
 | 2026-08-15 | Observability: structured **JSON-lines logs** + **Prometheus-text metrics snapshot**, local files only (Grafana Alloy/Loki/textfile-collector friendly). No listener, no push, no telemetry. New **PR 1.5**. |
 | 2026-08-15 | Testing: CI `cargo llvm-cov` gate ≥80% on core/catalog/engine; every PR ships unit tests + ≥1 integration test per touched boundary; redaction tests merge-blocking. |
+| 2026-08-15 | **Dedupe semantics (user):** consolidating duplicates across providers = one verified copy at the desired destination, evict redundant **local/USB** replicas in R1. Deleting the redundant **cloud** copy stays **R2** (`--allow-cloud-delete`, last-copy gated). |
 
 ---
 
