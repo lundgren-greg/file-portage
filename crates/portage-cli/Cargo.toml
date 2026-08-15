@@ -1,0 +1,20 @@
+[package]
+name = "portage-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Portage CLI: inventory local disks and clouds, plan space-safe moves"
+
+[[bin]]
+name = "portage"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+fs2 = { workspace = true }
+portage-core = { path = "../portage-core" }
+
+[dev-dependencies]
+tempfile = { workspace = true }

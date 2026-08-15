@@ -1,0 +1,10 @@
+[package]
+name = "portage-providers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Storage providers for Portage: local, Google Drive, OneDrive (stub until PR 4)"
+
+[dependencies]
+portage-core = { path = "../portage-core" }

@@ -1,0 +1,10 @@
+[package]
+name = "portage-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core types for Portage: errors, byte units, identifiers"
+
+[dependencies]
+thiserror = { workspace = true }

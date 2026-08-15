@@ -1,0 +1,10 @@
+[package]
+name = "portage-auth"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "OAuth PKCE and OS-protected token store for Portage (stub until PR 6)"
+
+[dependencies]
+portage-core = { path = "../portage-core" }

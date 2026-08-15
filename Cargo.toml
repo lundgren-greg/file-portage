@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/portage-core",
+    "crates/portage-catalog",
+    "crates/portage-auth",
+    "crates/portage-providers",
+    "crates/portage-media",
+    "crates/portage-engine",
+    "crates/portage-cli",
+    "crates/portage-sim",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/lundgren-greg/portage-app"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+fs2 = "0.4"
+tempfile = "3"

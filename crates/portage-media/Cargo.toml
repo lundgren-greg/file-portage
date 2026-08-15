@@ -1,0 +1,10 @@
+[package]
+name = "portage-media"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cheap media probing for Portage (stub until PR 5)"
+
+[dependencies]
+portage-core = { path = "../portage-core" }

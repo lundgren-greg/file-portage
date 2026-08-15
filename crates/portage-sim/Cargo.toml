@@ -1,0 +1,10 @@
+[package]
+name = "portage-sim"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "In-memory simulated world for Portage planner property tests (stub until PR 10)"
+
+[dependencies]
+portage-core = { path = "../portage-core" }

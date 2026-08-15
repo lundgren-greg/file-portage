@@ -1,0 +1,10 @@
+[package]
+name = "portage-catalog"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "SQLite catalog for Portage (stub until PR 3)"
+
+[dependencies]
+portage-core = { path = "../portage-core" }
