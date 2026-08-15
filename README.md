@@ -5,7 +5,7 @@
 
 ![Two people portaging a canoe over a rainy granite ridge — the product metaphor](docs/images/portage-trail.jpg)
 
-**Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. The GitHub repo is [`portage-app`](https://github.com/lundgren-greg/portage-app) so it does not collide with Gentoo Portage.
+**Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. (The name comes from the canoe trail, not Gentoo's package manager.)
 
 **Author / maintainer:** [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`). Nothing lands on `main` except through a pull request he reviews.
 
