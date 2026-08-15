@@ -1,4 +1,4 @@
-# Agent instructions — file-portage
+# Agent instructions — Portage (`portage-app`)
 
 Read `PROJECT.md` first for current status, blockers, and the session resume checklist.
 Keep it updated when you stop work.

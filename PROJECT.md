@@ -1,4 +1,4 @@
-# file-portage — project tracker
+# portage-app — project tracker
 
 > **Resume here** when starting a new session. Keep this file current when you stop work.
 > Optional Grok-Context thread: `C:\Repos\Grok-Context\threads\file-portage\`
@@ -6,10 +6,10 @@
 | Field | Value |
 |-------|--------|
 | **Local path** | `C:\Repos\file-portage` |
-| **GitHub** | `lundgren-greg/file-portage` |
+| **GitHub** | `lundgren-greg/portage-app` |
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
-| **Remote** | `origin` → https://github.com/lundgren-greg/file-portage.git |
+| **Remote** | `origin` → https://github.com/lundgren-greg/portage-app.git |
 | **Status** | Public. `main` is PR-only; Greg (`@lundgren-greg`) reviews every merge. Design approved. Next: PR 1. |
 | **Updated** | 2026-08-14 |
 
@@ -58,6 +58,13 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 | 5 | Catalog location | `init` measures C:. If < 8 GiB, recommend largest non-overlay volume. NL may confirm `data_dir`. Engine rejects unsafe dirs. No silent move. |
 | 6 | Google scope | **Full `drive`.** Consent copy explains why `drive.file` cannot inventory existing clips. |
 | 7 | TUI | **`portage-tui` in R1 after safety MVP (PR 15).** Color/hotkeys. Does not block PRs 1–13. |
+| 8 | First user of apply | **Greg's machine only.** No published OAuth client, no friend-install push in R1. |
+| 9 | Machines in R1 | **One PC.** Catalog on that host. Multi-machine is later. |
+| 10 | What “organize” means | **LLM conversation clarifies with the user** each time (`portage ask`). Engine default remains placement (where copies live). No autonomous rename/rebuild. |
+| 11 | External drive job | **Both hop and home.** Default `roles: [shuttle, final]`. Each plan chooses how that run uses the disk. |
+| 12 | Cloud accounts in R1 | **One Google, one Microsoft** (personal). A second account is another provider later. |
+| 13 | Evict aggressiveness | **Only cloud-only or unpinned collections.** Never evict `required` / pinned. `prefer` may drop local with a warning. |
+| 14 | Name | **Product Portage. Repo `portage-app`.** Binary `portage`. |
 
 ---
 
@@ -112,7 +119,7 @@ No `portage` binary yet.
 | Date | Decision |
 |------|----------|
 | 2026-08-14 | Standard repo kit from `lundgren-greg/repo-template`. License MIT. Default branch `main`. |
-| 2026-08-14 | Product name **Portage**; repo **file-portage**; binary **portage**. |
+| 2026-08-14 | Product name **Portage**; repo **portage-app** (renamed from file-portage); binary **portage**. |
 | 2026-08-14 | Stack: Rust + SQLite WAL + BLAKE3. Not Python, not C#, not rclone. |
 | 2026-08-14 | Cloud-to-cloud is always a local shuttle. Placeholders are not replicas. |
 | 2026-08-14 | Apply requires typing the plan id. Last-copy + private ACL + staging reserve are non-negotiable. |

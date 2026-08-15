@@ -8,7 +8,7 @@
 | **Status** | Approved (review 2026-08-14, 3 rounds; user questions resolved 2026-08-14) |
 | **Product name** | **Portage** |
 | **CLI / binary** | `portage` |
-| **GitHub repo** | `lundgren-greg/file-portage` |
+| **GitHub repo** | `lundgren-greg/portage-app` |
 | **License** | MIT |
 | **Primary OS** | Windows 10/11 (NTFS). Linux and macOS must compile and run local+cloud paths; Windows-only APIs are isolated behind traits. |
 
@@ -16,7 +16,7 @@
 
 **Keep the product name Portage.** The metaphor is exact: cargo is carried overland between two bodies of water because you cannot sail the gap. Here the “land” is a space-constrained local disk and the “waters” are cloud providers. Users already have the working name.
 
-**Do not name the GitHub repository `portage`.** That name is owned in most engineers’ heads by Gentoo’s package manager. Use **`file-portage`**. The binary stays `portage`. Crate names are `portage-*`.
+**Do not name the GitHub repository `portage`.** That name is owned in most engineers’ heads by Gentoo’s package manager. Use **`portage-app`**. The product and binary stay **Portage** / `portage`. Crate names are `portage-*`.
 
 Rejected names: Ferry (too generic, collisions), Stow (too cute, unclear), Manifest (noun collision with container images), Ark (overused).
 
@@ -105,7 +105,7 @@ Also in Release 1:
 | # | Decision | Rationale |
 | --- | --- | --- |
 | K1 | **Language: Rust** (edition 2021, stable toolchain). Not Python, not C#. | The product *is* the safety invariants: last-copy, checksums, crash journal, never-negative free space. Rust lets us put those in types and refuse to compile a delete that was not authorized by a `VerifiedReplicaGuard`. Multi-GB streaming hash and serial IO are systems work. A single `portage.exe` on Windows is the right UX. Official Drive/Graph SDKs are a liability here — they expose share-link helpers we must never call. Thin REST wrappers over the 8–10 endpoints we actually use are smaller and auditable. Python would iterate OAuth faster and lose on the planner/journal. C# is excellent for Graph and DPAPI but weaker at encoding planner invariants and at producing a small cross-OS CLI. |
-| K2 | **Repo `lundgren-greg/file-portage`, binary `portage`.** | Avoids Gentoo Portage collision; keeps the metaphor. |
+| K2 | **Repo `lundgren-greg/portage-app`, product/binary `portage`.** | Avoids Gentoo Portage and the niche “file-*” utility look. Keeps the metaphor. |
 | K3 | **SQLite catalog, WAL mode.** Default `%LOCALAPPDATA%\Portage\catalog.sqlite`. If `C:` free < 8 GiB, `init` **recommends** the largest non-overlay volume (`D:\PortageData`). Engine rejects overlay / Cloud Filter / free < 8 GiB `data_dir`. | Single-user, local-first, zero-admin, transactional, handles millions of rows, easy backup (copy one file). Postgres would be theater. A catalog on a full C: or DriveFS mount is unsafe. |
 | K4 | **Canonical content id is BLAKE3-256**, stored as `b3:<64 hex>`. Provider hashes (Google MD5, OneDrive SHA1 / QuickXor / SHA256) are *bindings*, not identity. On every transfer, hash BLAKE3 **and** the dest provider’s native algo in the same read; `UploadSession::finish` compares the computed native digest to the API-returned checksum. Evict STATs the dest and requires that stored native binding to match — never re-download a multi-GB object just to re-BLAKE3 it. | BLAKE3 is faster than SHA-256 on large videos and has a stable spec. Drive and Graph do not share a hash, so we cannot content-address cross-cloud without a local hash or a transfer. Index must not download cloud videos to obtain BLAKE3. Upload “verify” is native-digest match, not “BLAKE3 equals MD5.” |
 | K5 | **Two-phase identity: `suspect` then `verified`.** Every listed byte-file gets its own proto-blob (`content_id` NULL) unless a `(provider, algo, hex, size)` binding already points at a blob. Name+size matches are a `portage dups` grouping only and **never** merge blobs or count as last-copy. | Confirmed/verified = same `ContentId` after a local hash or a transfer we dual-hashed. Planner last-copy counts only `replicas.state = verified`. |
@@ -222,10 +222,10 @@ No daemon in v1. Incremental index is on-demand.
 
 ### Workspace and module tree
 
-New repo `file-portage` (nothing in `C:\Repos\Scripts` is part of this product):
+New repo `portage-app` (nothing in `C:\Repos\Scripts` is part of this product):
 
 ```text
-file-portage/
+portage-app/
 ├── Cargo.toml                          # workspace
 ├── Cargo.lock
 ├── rust-toolchain.toml                 # stable
@@ -1753,11 +1753,11 @@ Do not implement these in Release 1. They do not take priority over R1 no-data-l
 
 ## PR Plan
 
-Incremental, each PR independently reviewable and mergeable, this repo → usable MVP (local + Google Drive + OneDrive + planner + confirmed apply). Implementation agents start at PR 1. The repo already exists: `lundgren-greg/file-portage`.
+Incremental, each PR independently reviewable and mergeable, this repo → usable MVP (local + Google Drive + OneDrive + planner + confirmed apply). Implementation agents start at PR 1. The repo already exists: `lundgren-greg/portage-app`.
 
 ### PR 1 — Repository skeleton and CLI shell
 
-- **Title:** `chore: bootstrap file-portage workspace, MIT license, CLI stub`
+- **Title:** `chore: bootstrap portage-app workspace, MIT license, CLI stub`
 - **Files/components:** `Cargo.toml` workspace (**eight** members listed, `portage-sim` may be a stub; do **not** add `portage-tui` / `portage-nl` yet), `LICENSE`, `README.md`, `SECURITY.md`, `.gitignore`, `rust-toolchain.toml`, `.github/workflows/ci.yml`, `crates/portage-core` (errors, `ByteSize`), `crates/portage-cli` (`portage --help`, `portage init`), `configs/examples/gaming-clips.yaml` (Archives-first policy as specified), `docs/design.md` (this document)
 - **Depends on:** none
 - **Description:** Compiles on Windows and Ubuntu. `portage init` measures `C:` free; if `< 8 GiB` prints a recommendation for the largest non-overlay volume (`D:\PortageData`) and does **not** silently relocate. Creates `%data_dir%/portage.lock`. CI runs `fmt`, `clippy -D warnings`, `test`. No network, no SQLite yet.

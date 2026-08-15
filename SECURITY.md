@@ -2,7 +2,7 @@
 
 ## Scope
 
-**file-portage** (binary: `portage`) is a local-first inventory and shuttle tool. It will
+**Portage** (`lundgren-greg/portage-app`, binary: `portage`) is a local-first inventory and shuttle tool. It will
 eventually talk to Google Drive and Microsoft Graph **only** after the user runs
 `provider add` and later `apply`. There is no telemetry and no background daemon in MVP.
 
@@ -18,7 +18,7 @@ Treat paths, filenames, the SQLite catalog, and OAuth tokens as sensitive.
 
 If you discover a security issue, please **do not** open a public GitHub issue.
 
-Use [GitHub private vulnerability reporting](https://github.com/lundgren-greg/file-portage/security/advisories/new)
+Use [GitHub private vulnerability reporting](https://github.com/lundgren-greg/portage-app/security/advisories/new)
 when available, or contact the maintainer directly.
 
 We will acknowledge receipt within 72 hours.
