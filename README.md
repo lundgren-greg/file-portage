@@ -3,7 +3,8 @@
 [![CI](https://github.com/lundgren-greg/portage-app/actions/workflows/ci.yml/badge.svg)](https://github.com/lundgren-greg/portage-app/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![Uploading image.png…]()
+<img width="1936" height="1024" alt="image" src="https://github.com/user-attachments/assets/a88b9c5e-fe82-410e-b652-07be6a0a9115" />
+
 
 
 **Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. The GitHub repo is [`portage-app`](https://github.com/lundgren-greg/portage-app) so it does not collide with Gentoo Portage.
