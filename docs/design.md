@@ -5,7 +5,7 @@
 | **Title** | Portage: content-addressed inventory, placement policy, and space-safe shuttle for local + cloud files |
 | **Author** | TBD |
 | **Date** | 2026-08-14 |
-| **Status** | Approved (review 2026-08-14, 3 rounds, 0 open issues) |
+| **Status** | Approved (review 2026-08-14, 3 rounds; user questions resolved 2026-08-14) |
 | **Product name** | **Portage** |
 | **CLI / binary** | `portage` |
 | **GitHub repo** | `lundgren-greg/file-portage` |
@@ -28,7 +28,9 @@ Users have large personal libraries — especially game capture videos of 50 MiB
 
 Portage is a new standalone application (greenfield repo, not an extension of any existing scripts tree). It indexes every connected location into a local SQLite catalog using content-addressed identity, evaluates user placement policies, and produces an explicit, user-confirmed plan of copy / move / evict / shuttle operations. The planner is a space-aware sequencer: it will upload-and-evict to make room, then download, and it will refuse any plan that would drive local free space below a reserved staging budget at any step. The executor verifies checksums before it will consider a replica real, journals every mutation for crash resume, and never calls a public-sharing API.
 
-v1 is CLI-first on Windows. Architecture does not block a later TUI/GUI or Linux/macOS first-class support.
+The product front door in Release 1 is natural language (Grok first): the user says what they want, the model compiles that into collections/policy and a dry-run plan. **The LLM never applies.** Apply still requires typing the plan id. After the no-data-loss apply path works, a `ratatui` TUI (`portage-tui`) is the colorful review surface; the engine stays CLI-scriptable.
+
+Release 1 is Windows-first. Linux/macOS must compile. Android and other OS clients are Future releases.
 
 ---
 
@@ -62,30 +64,39 @@ This is a control-plane problem (catalog, policy, planner, journal) plus a data-
 
 ### Goals
 
+**Release 1 P0 — no data loss.** User files must be maintained. Last-copy protection, verify-before-delete, no apply without a typed plan id, no evict of a last *suspect* as if it were verified, and `undo` that refuses any reverse plan that would drop a blob to zero verified replicas or breach staging reserve are **not** optional polish. They ship before TUI and before the NL layer can compile to a plan.
+
+Also in Release 1:
+
 - Content-addressed inventory of local volumes and connected cloud providers, incremental, to at least **5 million file rows** and **multi-GB individual videos** without reading file bodies unless hashing or transferring.
 - Capacity view per volume and per provider (used / free / quota).
-- User-defined placement policies: collections, pin / keep-local / cloud-only, replica count, preferred provider, “most free cloud.”
+- User-defined placement policies: collections, pin / keep-local / cloud-only, replica count, preferred provider, “most free cloud.” Engine default for Gaming Clips is `keep_local: prefer` + `replica_shortfall` warning unless the user (or NL compile) says the file **must** stay local → `required`.
 - Dry-run plans the user must explicitly confirm. Residual local free space after every step. Rollback notes.
 - Correct shuttle sequencing under a tight local free-space budget.
-- Pluggable providers. v1: local NTFS (with placeholder awareness), Google Drive API, Microsoft Graph OneDrive.
+- Pluggable providers. Release 1: local NTFS (with placeholder awareness), Google Drive API, Microsoft Graph **personal** `/me/drive` only.
 - Safety invariants listed in [Safety Model](#safety-model) are non-negotiable.
 - Crash-safe journal; resume or compensate.
-- OAuth tokens encrypted at rest. No secrets in git.
+- OAuth: open browser → pick Google/Microsoft account → approve → return. Tokens encrypted at rest. No secrets in git. Bring-your-own client ids.
 - CLI that covers the full loop: connect → index → search/dups/capacity → plan → show → confirm/apply → status/resume → undo.
+- Natural-language front door (`portage ask`) that compiles utterances to policy + a dry-run plan. **LLM never applies.**
+- `portage-tui` (ratatui) after the safety MVP (PR 15). Color, hotkeys, plan review. Apply from the TUI still requires typing the plan id.
 
-### Non-Goals (v1)
+### Non-Goals (Release 1)
 
 - Real-time sync daemon / always-on watcher (USN journal / FUSE / Cloud Filter provider).
 - Editing or transcoding media.
-- Deduplicating *storage* (chunk-level CAS / CDC). We identify whole-file duplicates; we do not block-level-dedup on disk.
-- Automatic destructive apply. No “just keep the disk optimized” background job.
+- Deduplicating *storage* (chunk-level CAS / CDC). We identify whole-file duplicates; we do not block-level-dedup on disk. “Remove duplicates” in NL means plan extra-*local* evicts of confirmed dups when another verified replica exists — never a last-copy delete, never a cloud delete in R1.
+- Automatic destructive apply. No “just keep the disk optimized” background job. The LLM cannot bypass this.
 - Becoming a backup product with versioning, retention, or ransomware timelines (we keep last-copy safe; we do not implement a backup catalog of historical versions).
-- Shared-drive / SharePoint team-site administration, or multi-user collaboration.
-- Web UI, tray app, or TUI in MVP (interfaces are shaped so a TUI can come later).
+- Microsoft 365 / SharePoint site drives (Release 2).
+- Web UI or tray app.
 - Encryption-at-rest of the user’s file contents (we are not a zero-knowledge vault).
 - Bit-identical cloud-to-cloud without local staging. Not possible with Drive + Graph.
-- iOS/Android clients.
-- Creating or managing public share links — even as an opt-in feature in v1.
+- Android / iOS / other-OS clients (Future releases).
+- Running transfers or the catalog in a VM (idea only; Future releases).
+- Creating or managing public share links — even as an opt-in feature in Release 1.
+- Implementing `--allow-cloud-delete` (flag exists, rejected).
+- Shipping a published OAuth client id (R1 is bring-your-own).
 
 ---
 
@@ -95,7 +106,7 @@ This is a control-plane problem (catalog, policy, planner, journal) plus a data-
 | --- | --- | --- |
 | K1 | **Language: Rust** (edition 2021, stable toolchain). Not Python, not C#. | The product *is* the safety invariants: last-copy, checksums, crash journal, never-negative free space. Rust lets us put those in types and refuse to compile a delete that was not authorized by a `VerifiedReplicaGuard`. Multi-GB streaming hash and serial IO are systems work. A single `portage.exe` on Windows is the right UX. Official Drive/Graph SDKs are a liability here — they expose share-link helpers we must never call. Thin REST wrappers over the 8–10 endpoints we actually use are smaller and auditable. Python would iterate OAuth faster and lose on the planner/journal. C# is excellent for Graph and DPAPI but weaker at encoding planner invariants and at producing a small cross-OS CLI. |
 | K2 | **Repo `lundgren-greg/file-portage`, binary `portage`.** | Avoids Gentoo Portage collision; keeps the metaphor. |
-| K3 | **SQLite catalog at `%LOCALAPPDATA%\Portage\catalog.sqlite`, WAL mode.** | Single-user, local-first, zero-admin, transactional, handles millions of rows, easy backup (copy one file). Postgres would be theater. A pure in-memory model cannot survive crash or 5M files. |
+| K3 | **SQLite catalog, WAL mode.** Default `%LOCALAPPDATA%\Portage\catalog.sqlite`. If `C:` free < 8 GiB, `init` **recommends** the largest non-overlay volume (`D:\PortageData`). Engine rejects overlay / Cloud Filter / free < 8 GiB `data_dir`. | Single-user, local-first, zero-admin, transactional, handles millions of rows, easy backup (copy one file). Postgres would be theater. A catalog on a full C: or DriveFS mount is unsafe. |
 | K4 | **Canonical content id is BLAKE3-256**, stored as `b3:<64 hex>`. Provider hashes (Google MD5, OneDrive SHA1 / QuickXor / SHA256) are *bindings*, not identity. On every transfer, hash BLAKE3 **and** the dest provider’s native algo in the same read; `UploadSession::finish` compares the computed native digest to the API-returned checksum. Evict STATs the dest and requires that stored native binding to match — never re-download a multi-GB object just to re-BLAKE3 it. | BLAKE3 is faster than SHA-256 on large videos and has a stable spec. Drive and Graph do not share a hash, so we cannot content-address cross-cloud without a local hash or a transfer. Index must not download cloud videos to obtain BLAKE3. Upload “verify” is native-digest match, not “BLAKE3 equals MD5.” |
 | K5 | **Two-phase identity: `suspect` then `verified`.** Every listed byte-file gets its own proto-blob (`content_id` NULL) unless a `(provider, algo, hex, size)` binding already points at a blob. Name+size matches are a `portage dups` grouping only and **never** merge blobs or count as last-copy. | Confirmed/verified = same `ContentId` after a local hash or a transfer we dual-hashed. Planner last-copy counts only `replicas.state = verified`. |
 | K6 | **Never read/hydrate cloud placeholders.** Sync roots are excluded from the local walker via concrete registry/volume detectors (OneDrive `UserFolder`, DriveFS `DefaultMountPoint` / `Share` / `SyncTargets`, always-exclude `%LOCALAPPDATA%\Google\DriveFS`). `provider add local` refuses a root that *is* an overlay or a DriveFS/Cloud Filter volume. Cloud truth is the provider API. | Opening an online-only OneDrive file or walking DriveFS `G:` for BLAKE3 would hydrate it and can fill the disk. This is a Sev-0 footgun. |
@@ -107,9 +118,15 @@ This is a control-plane problem (catalog, policy, planner, journal) plus a data-
 | K12 | **OAuth tokens in OS credential store** (Windows DPAPI via `keyring` + `windows` CryptProtectData fallback). Refresh tokens never written as plaintext YAML. | Token theft = full library exfil. |
 | K13 | **Provider trait forbids share-link methods.** `assert_private` walks the item **and its ancestors** (Drive `permissionDetails` / Graph `inheritedFrom`) and fails on Anyone / AnyoneWithLink / `link.scope == anonymous`. Parent ACL is checked **before** `begin_write`. On post-upload failure, if `we_created`, the executor deletes the item (journal `Compensating`) and does not leave a public object. | Inherited folder shares make a new private-looking upload public without calling `createLink`. Compensation delete is required; `we_created` is a journal column. |
 | K14 | **MIT license.** | Personal tool, no patent posture, maximum reuse of the thin API clients. |
-| K15 | **CLI-first, library-second.** `portage-engine` is a crate the CLI calls. A future TUI/GUI is another binary on the same crates. | Prevents CLI-shaped business logic. |
+| K15 | **CLI-scriptable engine.** `portage-engine` is a crate. `portage` CLI and `portage-tui` are two binaries on the same crates. No business logic lives only in a UI. | Prevents CLI-shaped or TUI-shaped invariants. |
 | K16 | **No silent overwrite.** Same dest path + different `ContentId` = conflict op, not a write. Same dest path + same `ContentId` = idempotent no-op. | Path is not identity. |
-| K17 | **v1 providers implemented as HTTP + local FS, not rclone embedding.** | rclone is AGPL and its surface includes public-link and server-side copy behaviors we do not want to inherit. |
+| K17 | **Release 1 providers implemented as HTTP + local FS, not rclone embedding.** | rclone is AGPL and its surface includes public-link and server-side copy behaviors we do not want to inherit. |
+| K18 | **Grok-first NL front door, vendor-agnostic trait.** `portage-nl` talks to an `LlmProvider`. First impl is xAI Grok (`XAI_API_KEY`, `https://api.x.ai/v1`, default model `grok-4.5`; re-check docs.x.ai at implement time). Other vendors are additional impls of the same trait. | User wants to speak the product. Hard-coding one HTTP client to Grok would block later providers. |
+| K19 | **LLM never applies.** It emits structured `Intent` → policy YAML fragment + a dry-run `PlanId`. Apply, evict, upload, delete stay behind the typed plan-id gate (and last-copy / private-only / reserve). The model has no `Executor` handle. | An LLM that can delete is how you lose the library. |
+| K20 | **No data loss is Release 1 P0.** Safety MVP (PRs 1–13 apply+undo) ships before TUI and before NL compile-to-plan. | User: files must be maintained. Fun UX is R1 but after apply is safe. |
+| K21 | **TUI after safety MVP.** `portage-tui` (ratatui) is PR 15. Color, hotkeys, configurability. It reviews plans and can *launch* apply; the user still types the plan id. PRs 1–13 are not blocked on it. | Fun surface without putting chrome in front of last-copy. |
+| K22 | **Catalog location: `init` recommends; NL may confirm; engine rejects unsafe dirs.** If `C:` free < 8 GiB, recommend the largest non-overlay volume (`D:\PortageData`). No silent move. Reject `data_dir` on a volume with free < 8 GiB or that is an overlay / Cloud Filter mount. | Catalog on a full C: or a DriveFS mount is a Sev-0 footgun. |
+| K23 | **Undo is reverse-plan + second typed plan id.** Never auto-start re-downloads. Refuse if the reverse plan would drop any blob to zero verified replicas or breach staging reserve. | Undo that silently re-downloads can fill the disk; undo that deletes a last copy is data loss. |
 
 ---
 
@@ -119,8 +136,16 @@ This is a control-plane problem (catalog, policy, planner, journal) plus a data-
 
 ```mermaid
 flowchart TB
-  subgraph cli [portage-cli]
-    CMD[clap commands]
+  subgraph fronts [front doors]
+    CMD[portage CLI]
+    TUI[portage-tui]
+    ASK[portage ask / NL]
+  end
+
+  subgraph nl [portage-nl]
+    INT[Intent schema]
+    LLM[LlmProvider trait]
+    GROK[Grok / xAI]
   end
 
   subgraph engine [portage-engine]
@@ -142,15 +167,20 @@ flowchart TB
   end
 
   subgraph auth [portage-auth]
-    OAUTH[OAuth installed-app]
+    OAUTH[OAuth browser PKCE]
     KR[DPAPI / keyring]
   end
 
-  CFG[config.yaml] --> CMD
+  ASK --> INT
+  INT --> LLM
+  LLM --> GROK
+  INT -->|"policy + dry-run plan only"| PLN
   CMD --> POL
   CMD --> PLN
   CMD --> EXE
-  CMD --> TRAIT
+  TUI --> POL
+  TUI --> PLN
+  TUI -->|"typed plan id"| EXE
   POL --> DB
   PLN --> DB
   EXE --> JRN
@@ -172,14 +202,16 @@ Responsibilities:
 | Component | Responsibility | Must not do |
 | --- | --- | --- |
 | **CLI** | Parse, render tables, confirmation prompt, progress bars | Mutate files except by calling executor |
+| **TUI** | Color inventory/plan review, hotkeys, launch apply | Apply without a typed plan id; own a second executor |
+| **NL (`portage-nl`)** | Utterance → validated `Intent` → policy fragment + dry-run plan | Call executor; delete; evict; upload; skip confirm |
 | **Catalog** | Durable inventory, plans, journal, capacity snapshots | Know about HTTP |
 | **Indexer** | Walk / page providers, upsert rows, schedule hashes | Open placeholders; load whole videos |
 | **Policy engine** | Pure function: catalog + rules → desired placement per **file** (then attached to that file’s blob) | Touch the network |
 | **Planner** | Desired − current → ordered ops with residual **during and after** each op | Apply anything |
 | **Journal** | Crash-safe state machine per op | Decide policy |
 | **Executor** | Serial apply, verify, last-copy check, ACL assert | Skip verify; call share APIs |
-| **Providers** | List / stat / ranged read / resumable write / delete / quota / ACL | Hydrate; create public links |
-| **Auth** | Device/installed OAuth, refresh, token encrypt | Log tokens |
+| **Providers** | List / stat / ranged read / delete / quota / ACL | Hydrate; create public links |
+| **Auth** | Browser PKCE (open → pick account → approve → return), refresh, token encrypt | Log tokens |
 
 ### Process model
 
@@ -301,17 +333,31 @@ file-portage/
     │       │   ├── status.rs
     │       │   ├── resume.rs
     │       │   ├── undo.rs
-    │       │   └── doctor.rs
+    │       │   ├── doctor.rs
+    │       │   └── ask.rs              # portage ask — NL front door (PR 16)
     │       └── render.rs               # tables, plan listing
-    └── portage-sim/
-        ├── Cargo.toml
+    ├── portage-sim/
+    │   ├── Cargo.toml
+    │   └── src/
+    │       ├── lib.rs                  # SimulatedWorld for property tests
+    │       └── bin/
+    │           └── portage-sim.rs
+    ├── portage-nl/                       # PR 16; optional read-only stub after PR 5
+    │   ├── Cargo.toml
+    │   └── src/
+    │       ├── lib.rs
+    │       ├── intent.rs               # Intent JSON schema
+    │       ├── compile.rs              # Intent → policy + planner input
+    │       └── providers/
+    │           ├── mod.rs              # trait LlmProvider
+    │           └── grok.rs             # xAI
+    └── portage-tui/                      # PR 15, after safety MVP
+        ├── Cargo.toml                  # [[bin]] name = "portage-tui"
         └── src/
-            ├── lib.rs                  # SimulatedWorld for property tests
-            └── bin/
-                └── portage-sim.rs      # optional CLI to replay scenarios
+            └── main.rs
 ```
 
-Workspace `Cargo.toml` members are the **eight** crates above (`portage-core`, `portage-catalog`, `portage-auth`, `portage-providers`, `portage-media`, `portage-engine`, `portage-cli`, `portage-sim`). Shared deps pinned in `[workspace.dependencies]`: `tokio`, `rusqlite`, `serde`, `serde_yaml`, `blake3`, `md-5`, `sha1`, `sha2`, `reqwest`, `oauth2`, `keyring`, `tracing`, `thiserror`, `anyhow`, `clap`, `indicatif`, `uuid`, `time`, `walkdir`, `proptest`, `tempfile`, `directories`, `infer`, `base64`, `url`, `async-trait`, `fs2`, `windows` (Windows target only).
+Workspace members at PR 1 are the original **eight** crates (`portage-core`, `portage-catalog`, `portage-auth`, `portage-providers`, `portage-media`, `portage-engine`, `portage-cli`, `portage-sim`). `portage-tui` joins in PR 15. `portage-nl` joins in PR 16 (a compile-only stub crate may land earlier if it does not call the planner). Shared deps pinned in `[workspace.dependencies]`: `tokio`, `rusqlite`, `serde`, `serde_yaml`, `blake3`, `md-5`, `sha1`, `sha2`, `reqwest`, `oauth2`, `keyring`, `tracing`, `thiserror`, `anyhow`, `clap`, `indicatif`, `uuid`, `time`, `walkdir`, `proptest`, `tempfile`, `directories`, `infer`, `base64`, `url`, `async-trait`, `fs2`, `ratatui`, `crossterm`, `windows` (Windows target only).
 
 ### Content identity
 
@@ -899,9 +945,9 @@ must match only test fixtures that assert we *reject* such payloads.
 - After upload: `GET /me/drive/items/{id}?expand=permissions` and walk `parentReference` until drive root. Fail if `link.scope == anonymous` or principal `anyone`. `we_created` + fail → delete item.
 - Native verify: `MultiHasher` SHA1 / QuickXor / SHA256 (whichever `file.hashes` will return) vs the upload response. Bindings only — not `ContentId`.
 
-#### v1.1+ providers (interfaces only in v1)
+#### Future-release providers (interfaces only in Release 1)
 
-Dropbox, S3-compatible (Backblaze B2, Wasabi, AWS), SMB/NAS. Same trait. S3: private ACL `bucket-owner-full-control` / block public ACLs; never `public-read`.
+Dropbox, S3-compatible (Backblaze B2, Wasabi, AWS), SMB/NAS, Microsoft 365 / SharePoint. Same trait. S3: private ACL `bucket-owner-full-control` / block public ACLs; never `public-read`. See [Future releases](#future-releases).
 
 ### Indexer + media
 
@@ -913,9 +959,9 @@ Dropbox, S3-compatible (Backblaze B2, Wasabi, AWS), SMB/NAS. Same trait. S3: pri
 
 | Command | Behavior |
 | --- | --- |
-| `portage init` | Create `%LOCALAPPDATA%\Portage\`, config from example, empty catalog, lock dir |
-| `portage provider add google-drive` | OAuth; store token; write provider id into config |
-| `portage provider add onedrive` | Same for Graph |
+| `portage init` | Measure `C:` free. If `C:` < 8 GiB, **recommend** (do not silently use) the largest non-overlay volume as `data_dir` (e.g. `D:\PortageData`). Show the recommendation and wait for accept / `--data-dir`. Reject a chosen dir on a volume with free < 8 GiB or that is an overlay / Cloud Filter mount. Then write config, empty catalog, lock file. |
+| `portage provider add google-drive` | Open the system browser → user picks the Google account → approve → return to the CLI. Store token; write provider id into config. Consent copy must say why full `drive` is required (`drive.file` cannot see existing clips). |
+| `portage provider add onedrive` | Same browser PKCE flow for Microsoft personal account (`/me/drive` only). |
 | `portage provider add local --root D:\ --id local-d` | Register a volume |
 | `portage provider list` | Ids, kind, account, last index, capacity |
 | `portage index [--provider ID]` | Incremental scan + local hash of dirty LocalFull files |
@@ -928,8 +974,10 @@ Dropbox, S3-compatible (Backblaze B2, Wasabi, AWS), SMB/NAS. Same trait. S3: pri
 | `portage apply PLAN [--allow-cloud-delete] [--i-know]` | Prompt: type the plan id; then serial execute. `--allow-cloud-delete` is **parsed and rejected** in MVP (`not implemented in v0.1; cloud objects are never deleted`, exit 2). `--i-know` is required together with `flags.allow_tiny_reserve` to accept `staging_reserve_bytes < 64 MiB` at plan/apply time. |
 | `portage status` | In-flight journal, last plan, lock holder |
 | `portage resume` | Continue Needs-resume journal |
-| `portage undo` | Reverse last **committed** plan where possible |
+| `portage undo` | Build a **reverse plan** of the last committed plan. Never auto-start re-downloads. Print the reverse plan and require a **second typed plan id**. Refuse (exit 6 or 4) if any reverse op would drop a blob to zero verified replicas or if the reverse plan’s trough would breach `staging_reserve`. |
 | `portage doctor` | Lock, catalog integrity, overlay roots, token validity, placeholder sanity, `rg`-equivalent ACL audit of last uploads |
+| `portage ask "…"` | NL front door (PR 16). Compiles the utterance to an `Intent`, writes/shows a policy fragment, runs the planner, prints a dry-run plan. **Does not apply.** |
+| `portage-tui` | Separate binary (PR 15). Browse inventory, review a plan in color, hotkeys to expand ops, launch apply (still types the plan id). |
 
 `apply` confirmation text:
 
@@ -943,6 +991,109 @@ Type the plan id to apply, or Ctrl-C to abort:
 Empty, `y`, or `yes` is **rejected**.
 
 Exit codes: `0` ok, `2` usage, `3` locked, `4` unsatisfiable plan, `5` space drift, `6` last-copy, `7` ACL/public, `8` verify fail, `10` needs attention.
+
+### Natural-language / Grok layer
+
+The LLM is the product front door, not an executor. Crate: `portage-nl`. CLI: `portage ask "…"`. TUI may open the same compile path. **There is no `apply` method on this crate.**
+
+#### Provider trait (not a hard-coded vendor)
+
+```rust
+#[async_trait]
+pub trait LlmProvider: Send + Sync {
+    fn id(&self) -> &str;
+    async fn complete_json(&self, system: &str, user: &str, schema: &JsonSchema) -> Result<serde_json::Value>;
+}
+```
+
+**Grok first (Release 1):**
+
+| Setting | Value |
+| --- | --- |
+| Env | `XAI_API_KEY` (never YAML, never committed) |
+| Base URL | `https://api.x.ai/v1` |
+| Default model | `grok-4.5` — **re-check [docs.x.ai](https://docs.x.ai) at implement time** |
+| API shape | OpenAI-compatible chat completions; request JSON matching `Intent` |
+
+Additional vendors are more `LlmProvider` impls (`openai`, `anthropic`, …) selected in config `nl.provider`. R1 ships Grok only.
+
+#### Intent schema (compiler input)
+
+The model must return JSON that deserializes to `Intent`. On schema failure, `portage ask` reprints the error and does not touch policy.
+
+```rust
+pub struct Intent {
+    pub summary: String,                    // one-line restatement for the user
+    pub collections: Vec<CollectionDraft>,  // may be empty → use existing YAML
+    pub keep_local: Option<KeepLocal>,      // None → engine default prefer
+    pub dests: Vec<DestHint>,               // local path and/or provider+subdir
+    pub year: Option<i32>,                  // e.g. "photos for this year"
+    pub dedup: DedupIntent,                 // None | ExtraLocalOnly
+    pub data_dir: Option<PathBuf>,          // optional catalog location confirm
+}
+
+pub enum DedupIntent { None, ExtraLocalOnly }
+pub struct DestHint {
+    pub kind: DestKind, // LocalPath | ProviderSubdir
+    pub location: String,
+}
+```
+
+Compile rules (`compile.rs`), deterministic, no LLM:
+
+1. Validate `Intent` against the catalog (unknown provider → error; overlay `data_dir` → engine reject).
+2. If `data_dir` is set, same reject rules as `init` (free < 8 GiB or overlay → refuse).
+3. Merge `CollectionDraft` into a policy fragment. Do not silently replace the user’s YAML; write a dated fragment under `%data_dir%/intents/` and show the diff.
+4. `keep_local`: if the utterance (compiled field) is `Required` — user said “must stay on C:” / “onto my C drive” — use `required`. Otherwise engine default **`prefer`** + `replica_shortfall` warning.
+5. `DedupIntent::ExtraLocalOnly`: for each confirmed (`ContentId`) group, `CanEvict` extra **local** replicas only when another **verified** replica remains. Never emit cloud deletes. Never evict a last copy.
+6. Call the existing planner. Show the dry-run plan. Stop.
+7. The user runs `portage apply <plan-id>` (or the TUI does the same typed confirm).
+
+#### Example utterances
+
+**Gaming clips (default policy):**
+
+> “Keep my gaming videos on D: if they fit, and on whichever of Google Drive or OneDrive has more free space.”
+
+Compiles to the checked-in Gaming Clips collection (`keep_local: prefer`, `cloud: most_free`). Tight disk → `replica_shortfall`, still Satisfiable.
+
+> “My gaming clips must stay on C:.”
+
+Compiles to `keep_local: required` on that collection. Unsatisfiable if they do not fit after evictions.
+
+**Photo consolidation (user example):**
+
+> “Please remove all my duplicate photos across all locations and consolidate my photos onto my C drive photos directory and my google drive photos for this year.”
+
+Compiles to:
+
+| Field | Value |
+| --- | --- |
+| Collection | Photos — `mime_prefix: image/`, optional `mtime` year = current year |
+| `keep_local` | `required` (they named a C: directory) |
+| Local dest | `C:\Users\<user>\Pictures` or an explicit `C:\…\Photos` if it exists; else ask |
+| Cloud dest | `gdrive:/Photos/<year>` |
+| Dedup | `ExtraLocalOnly` — extra local copies of a confirmed blob, only if a verified replica remains |
+| Cloud deletes | none (R1) |
+| Apply | not invoked |
+
+If C: cannot hold the required local photos after evicting extra dups, the planner returns Unsatisfiable with suggestions — still no writes.
+
+#### What the NL layer must never do
+
+- Hold an `Executor`, call `apply`, `delete`, `evict`, or `begin_write`.
+- Skip `LastCopyGuard`, `assert_private`, or the typed plan-id prompt.
+- Invent a public share or a cloud-to-cloud SaaS path.
+- Choose a `data_dir` the engine would reject.
+
+#### When to implement
+
+- **Read-only stub** (optional, after PR 5): `portage ask` can answer “what photos do I have?” by compiling to `search` / `dups` / `list` only. No planner. Safe because it cannot mutate.
+- **Compile-to-plan: PR 16**, depends on PR 10 (planner) and preferably PR 12 (so a produced plan is apply-able). Not before.
+
+### TUI (`portage-tui`)
+
+Second binary, ratatui + crossterm. Color, hotkeys, user-configurable theme/keybinds (config `tui:`). Screens: capacity, collections, dups, plan review (expand/collapse ops, residual column highlighted when close to reserve), doctor. **Apply key** opens the same typed-plan-id modal as the CLI. The TUI does not get a hidden confirm. Engine remains fully usable with no TUI installed.
 
 ---
 
@@ -1177,6 +1328,16 @@ auth:
   # client secrets are desktop-app public-ish IDs; still not committed.
   # tokens never live here.
 
+nl:
+  provider: grok                    # LlmProvider id; only grok in R1
+  grok_base_url: "https://api.x.ai/v1"
+  grok_model: grok-4.5              # re-check docs.x.ai at implement time
+  api_key_env: XAI_API_KEY          # never store the key in this file
+
+tui:
+  theme: default
+  # keybinds overridable later; apply always opens typed-id modal
+
 providers:
   - id: local-d
     type: local
@@ -1352,7 +1513,7 @@ Non-negotiable invariants, with the code site that enforces them:
 | Planner deadlock (stuck with leftover) | Sev-2 | Unsatisfiable + suggestions; never partial-apply without journal |
 | BLAKE3 implementation bug | Sev-2 | Use crate `blake3`; cross-check a fixture vector in tests |
 | OAuth phishing (fake loopback) | Sev-2 | Google binds 127.0.0.1; Microsoft binds localhost; show expected state/PKCE |
-| Catalog on full C: | Sev-2 | `init` warns; `data_dir` on D: |
+| Catalog on full C: or on a DriveFS/OneDrive overlay | Sev-1 | `init` measures; recommends largest non-overlay volume if C: < 8 GiB; engine **rejects** unsafe `data_dir` (including NL-chosen). No silent move. |
 
 ---
 
@@ -1390,7 +1551,9 @@ Non-negotiable invariants, with the code site that enforces them:
 
 ### Auth details
 
-- Google: OAuth 2.1-style PKCE, loopback **`http://127.0.0.1:<ephemeral>/`**, `access_type=offline`, `prompt=consent` once to obtain refresh. Desktop client id from `PORTAGE_GOOGLE_CLIENT_ID`. Register `http://127.0.0.1` (not `localhost`) as an authorized redirect in Google Cloud Console.
+**UX requirement (not a new protocol):** `provider add` opens the system browser, the user picks the Google or Microsoft account, approves, and is returned to the app. No paste-the-code dance unless the browser cannot bind the loopback port (then show the URL and fail clearly). PKCE loopback already specified; this is the bar for “super simple.”
+
+- Google: OAuth 2.1-style PKCE, loopback **`http://127.0.0.1:<ephemeral>/`**, `access_type=offline`, `prompt=consent` once to obtain refresh. Desktop client id from `PORTAGE_GOOGLE_CLIENT_ID` (bring-your-own in Release 1). Register `http://127.0.0.1` (not `localhost`) as an authorized redirect in Google Cloud Console. Consent screen / README must state: **we request full `drive` because `drive.file` can only see files this app created and cannot inventory the clips you already have.**
 - Microsoft: MSAL-equivalent auth code + PKCE against `https://login.microsoftonline.com/consumers` (personal) in v1. Redirect **`http://localhost:<ephemeral>/`** — this is what Azure public-client docs accept; `127.0.0.1` will stall a BYO Azure app. Client id from `PORTAGE_MS_CLIENT_ID`.
 - Token store order: OS keyring (`file-portage` / `provider:{id}`); if that fails on Windows, `%data_dir%/tokens.dpapi` (`CryptProtectData`, user-only ACL). Linux: native keyring, else refuse (no plaintext fallback).
 - Refresh happens in `portage-auth`; 401 on a provider call triggers one refresh and retry.
@@ -1427,17 +1590,21 @@ Local app — no SaaS metrics backend.
 
 This is a new GitHub repo, not a production service. “Rollout” = implementability and safe use on the author’s machine.
 
-1. **Empty repo → PR 1–4:** local-only inventory and capacity. Useful immediately (“what is on D: and what is duplicated locally”).
-2. **PR 5–7:** OAuth + Drive + OneDrive list/quota. Still read-only. Author can see a unified inventory without mutation.
-3. **PR 8–9:** Policy + planner dry-run. Author can see the 4 GiB shuttle plan and inspect residuals. No writes.
-4. **PR 10–12:** Journal + executor + CLI apply. First mutations: local-to-local copy in tests, then one small real upload (`--max-bytes 8MiB` flag on apply for the first week).
-5. **PR 13–14:** Undo, doctor, ACL audit, docs.
+**Release 1 P0 is no data loss.** Do not start TUI (PR 15) or NL compile-to-plan (PR 16) until apply + undo refuse unsafe reverses (PR 13).
 
-**Feature flags** live in `config.yaml` `flags:` (see Config section). `allow_cloud_delete` is parsed and **rejected** in MVP. `allow_tiny_reserve` + CLI `--i-know` is the only way to set reserve below 64 MiB.
+1. **PR 1–4:** local-only inventory and capacity. Useful immediately. `init` measures C: and recommends `data_dir`.
+2. **PR 5–8:** OAuth (browser PKCE) + Drive + OneDrive list/quota. Still read-only. Optional NL **read-only** stub may start after PR 5.
+3. **PR 9–10:** Policy + planner dry-run. 4 GiB fixture. No writes.
+4. **PR 11–13:** Journal + executor + confirmed apply + undo that refuses last-copy / reserve breaches. First mutations behind `--max-apply-bytes` soak.
+5. **PR 14:** Docs, progress, release workflow. Safety MVP tag.
+6. **PR 15:** `portage-tui`. Fun UX. Apply still types the plan id.
+7. **PR 16:** `portage-nl` + `portage ask`. Compiles to policy + plan. Never applies.
 
-**Rollback of a bad build:** CLI is a single exe; keep `portage.exe.bak`. Catalog migrations are additive; a newer catalog may not open in an older exe (`user_version` check). Never migrate destructively in MVP.
+**Feature flags** live in `config.yaml` `flags:` (see Config section). `allow_cloud_delete` is parsed and **rejected** in Release 1. `allow_tiny_reserve` + CLI `--i-know` is the only way to set reserve below 64 MiB.
 
-**Rollback of a bad plan:** `portage undo` (see engine `undo.rs`): reverse committed ops newest-first; evicts become downloads from the stored `remote_ref`; uploads we created become deletes **only if** last-copy still holds and `we_created=true`. If undo cannot be safe, stop and print the leftover.
+**Rollback of a bad build:** CLI is a single exe; keep `portage.exe.bak`. Catalog migrations are additive; a newer catalog may not open in an older exe (`user_version` check). Never migrate destructively in R1.
+
+**Rollback of a bad plan:** `portage undo` builds a reverse plan (evicts → downloads from stored `remote_ref`; uploads we created → deletes only if `we_created` and last-copy still holds). It **prints** that reverse plan and requires a **second typed plan id**. It **refuses** if the reverse would drop any blob to zero verified replicas or if simulated troughs breach `staging_reserve`. It never auto-starts re-downloads. If undo cannot be safe, stop and print the leftover.
 
 ---
 
@@ -1450,6 +1617,8 @@ This is a new GitHub repo, not a production service. “Rollout” = implementab
 - `placeholder.rs`: attribute fixtures (skip if not Windows).
 - `policy.rs`: first-match; Archives-before-Gaming-Clips on `D:\OldClips\old.mp4` **and** on `gdrive:/Archives/cutscene.mp4` (`/Archives/` required; `/Archive/` alone must **not** match); Gaming Clips on `D:\Videos\Captures\boss.mp4`; `prefer` fallback emits `replica_shortfall` not Unsatisfiable; dest_path = `dest_subdir` + basename.
 - `last_copy.rs`: refuse when only suspect replica remains; allow when two verified; name+size group is irrelevant.
+- `undo.rs`: reverse-plan of the 4 GiB fixture requires a second id; refuse if staging reserve would break or a blob would hit 0 verified; never calls executor on `undo` without confirm.
+- `portage-nl` compile: photo-consolidation utterance fixture → `keep_local: required` on C: Photos, gdrive `/Photos/<year>`, `ExtraLocalOnly` dedup, **zero** cloud deletes, **does not** invoke apply. “must stay on C:” → `required`. Unspecified keep → `prefer`.
 - `hash.rs` `MultiHasher`: BLAKE3+MD5 of a fixture equals standalone hashes.
 
 ### Planner property / simulation (`portage-sim` + `proptest`)
@@ -1494,15 +1663,39 @@ P-space and P-last-copy must be present and green. A planner PR without those tw
 
 ---
 
-## Open Questions
+## Resolved questions
 
-1. **Google OAuth client branding.** A desktop client id must be created in Google Cloud Console (and an Azure app registration for Microsoft). Who owns those developer tenants, and do we ship a default public client id (common for desktop OSS) or require the user to bring their own? **Recommendation:** bring-your-own in v1 (`PORTAGE_GOOGLE_CLIENT_ID`), document a 10-minute setup; add a published client id only after verification.
-2. **OneDrive personal vs Microsoft 365 / SharePoint.** v1 is `/me/drive` consumers. Need a later decision for business accounts (`organizations` tenant).
-3. **Default `keep_local: prefer` vs `required` for Gaming Clips.** Prefer will silently leave a clip cloud-only if D: cannot hold it; required will fail the plan. **Recommendation:** `prefer` plus a plan warning section “N clips not kept local (X GiB short).”
-4. **Whether v1 `undo` should re-download evicted files automatically** (costs space) or only print the reverse plan for confirmation. **Recommendation:** `undo` builds a reverse plan and requires a second typed id.
-5. **Catalog relocation off C:** automatic vs documented. **Recommendation:** `init` measures C: free and prompts.
-6. **Google `drive` full scope UX.** Some users will balk. Alternative is “only manage a Portage folder” (`drive.file`) which **cannot** inventory existing clips — it fails the user problem. Stay on full `drive` and explain why in the consent README.
-7. **TUI timeline.** Not blocking. If CLI apply is painful on 200-op plans, a `ratatui` viewer is a post-MVP binary.
+User answers 2026-08-14. These are final.
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | OAuth client ids | **Bring-your-own in Release 1.** `PORTAGE_GOOGLE_CLIENT_ID`, `PORTAGE_MS_CLIENT_ID`. No shipped public client id. |
+| 2 | OneDrive scope | **Personal `/me/drive` only in Release 1.** Microsoft 365 / SharePoint is **Release 2** (Future releases). |
+| 3 | Interaction / `keep_local` | **LLM is the front door** (Grok first; other vendors via trait). Compiles utterances to policy + dry-run plan. **LLM never applies.** Engine default for Gaming Clips is `keep_local: prefer` + `replica_shortfall` unless the user says the files must stay on a given volume → `required`. Auth UX: browser → pick account → approve → return. |
+| 4 | Undo / data loss | **No data loss is Release 1 P0.** Undo is **reverse-plan + second typed plan id**. Never auto-start re-downloads. Refuse if reverse would drop a blob to zero verified replicas or breach staging reserve. |
+| 5 | Catalog location | `init` measures C:. If C: < 8 GiB, recommend the largest non-overlay volume. NL may pick/confirm `data_dir`. Engine **rejects** a dir on a volume with free < 8 GiB or an overlay / Cloud Filter mount. No silent move. |
+| 6 | Google scope | **Full `drive`.** Consent copy explains that `drive.file` cannot inventory existing clips. |
+| 7 | TUI | **`portage-tui` (ratatui) in Release 1 after the safety MVP (PR 15).** Color, hotkeys, configurability. Does not block PRs 1–13. Apply still requires the typed plan id. |
+
+## Future releases
+
+Do not implement these in Release 1. They do not take priority over R1 no-data-loss.
+
+| Item | Notes |
+| --- | --- |
+| **Release 2: Microsoft 365 / SharePoint** | Site drives, `organizations` tenant. Same last-copy / private-only rules. |
+| Dropbox, S3-compatible (B2 / Wasabi / AWS), SMB / NAS | Same `Provider` trait. S3: never `public-read`. |
+| `--allow-cloud-delete` implementation | Flag exists and is rejected in R1. Still last-copy gated if ever implemented. |
+| USN Journal incremental local index | After the walker is correct. |
+| Optional `ffprobe` | When `PORTAGE_FFPROBE` is set. |
+| FTS5 search | After `search` LIKE is good enough. |
+| Extra `LlmProvider` impls | OpenAI, Anthropic, local models. Trait exists in R1; only Grok ships. |
+| Android / other OS clients | Idea. Windows remains primary. |
+| VM isolation of transfers or the catalog | Idea only. Not scheduled. |
+| `preserve_relpath` | Dest path currently `dest_subdir` + basename. |
+| Complete (non-greedy) planner search | R1 planner is greedy + `P-prefix-safe`. |
+| Background daemon / Cloud Filter / FUSE | Out of product scope until explicitly scheduled. |
+| Published OAuth client id | After verification; not R1. |
 
 ---
 
@@ -1520,6 +1713,7 @@ P-space and P-last-copy must be present and green. A planner PR without those tw
 - RFC 7636 PKCE
 - SQLite WAL: https://www.sqlite.org/wal.html
 - Gentoo Portage (name collision to avoid in the repo name): https://wiki.gentoo.org/wiki/Portage
+- xAI API (Grok): https://docs.x.ai — re-check base URL and model id at implement time
 
 ---
 
@@ -1530,9 +1724,9 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 ### PR 1 — Repository skeleton and CLI shell
 
 - **Title:** `chore: bootstrap file-portage workspace, MIT license, CLI stub`
-- **Files/components:** `Cargo.toml` workspace (**eight** members listed, `portage-sim` may be a stub), `LICENSE`, `README.md`, `SECURITY.md`, `.gitignore`, `rust-toolchain.toml`, `.github/workflows/ci.yml`, `crates/portage-core` (errors, `ByteSize`), `crates/portage-cli` (`portage --help`, `portage init` creating the data dir **and empty `portage.lock`**), `configs/examples/gaming-clips.yaml` (Archives-first policy as specified), `docs/design.md` (this document)
+- **Files/components:** `Cargo.toml` workspace (**eight** members listed, `portage-sim` may be a stub; do **not** add `portage-tui` / `portage-nl` yet), `LICENSE`, `README.md`, `SECURITY.md`, `.gitignore`, `rust-toolchain.toml`, `.github/workflows/ci.yml`, `crates/portage-core` (errors, `ByteSize`), `crates/portage-cli` (`portage --help`, `portage init`), `configs/examples/gaming-clips.yaml` (Archives-first policy as specified), `docs/design.md` (this document)
 - **Depends on:** none
-- **Description:** Compiles on Windows and Ubuntu. `portage init` writes a default config with no providers and creates `%data_dir%/portage.lock`. CI runs `fmt`, `clippy -D warnings`, `test`. No network, no SQLite yet.
+- **Description:** Compiles on Windows and Ubuntu. `portage init` measures `C:` free; if `< 8 GiB` prints a recommendation for the largest non-overlay volume (`D:\PortageData`) and does **not** silently relocate. Creates `%data_dir%/portage.lock`. CI runs `fmt`, `clippy -D warnings`, `test`. No network, no SQLite yet.
 
 ### PR 2 — Core identity, hashing, and safe paths
 
@@ -1567,7 +1761,7 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 - **Title:** `feat(auth): installed-app OAuth with OS-protected token store`
 - **Files/components:** `crates/portage-auth/**`, CLI `provider add google-drive` / `onedrive` up through token persistence (HTTP can still be mocked), `provider revoke`, `SECURITY.md` update
 - **Depends on:** PR 1 (can merge after PR 4 in practice; logically independent of hashing)
-- **Description:** Loopback PKCE. Google redirect `http://127.0.0.1`; Microsoft redirect `http://localhost` (required for BYO Azure public clients). Tokens never written to YAML. Windows: keyring, then `%data_dir%/tokens.dpapi` (`CryptProtectData`, user-only ACL). Linux: native keyring only (no plaintext fallback). Tests with a fake IdP or recorded token-exchange (no live secrets).
+- **Description:** Loopback PKCE. **UX:** open system browser → user picks the account → approve → return. Google redirect `http://127.0.0.1`; Microsoft redirect `http://localhost` (required for BYO Azure public clients). BYO ids: `PORTAGE_GOOGLE_CLIENT_ID`, `PORTAGE_MS_CLIENT_ID`. Consent copy states why full `drive` is required. Tokens never written to YAML. Windows: keyring, then `%data_dir%/tokens.dpapi`. Linux: native keyring only. Tests with a fake IdP or recorded token-exchange (no live secrets).
 
 ### PR 7 — Google Drive provider (read + quota + private write)
 
@@ -1616,13 +1810,27 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 - **Title:** `feat(safety): reverse-plan undo, doctor, public-ACL audit`
 - **Files/components:** `portage-engine/src/undo.rs`, CLI `undo` (builds reverse plan, typed confirm), `doctor` (integrity, overlays, tokens, journal NeedsAttention, last-upload ACL recheck), `docs/threat-model.md`
 - **Depends on:** PR 12
-- **Description:** Undo never deletes a last copy; reverse-plan uses `we_created` + stored `dest_remote_ref`. Doctor non-zero exit codes documented, including OneDrive/DriveFS installed but no overlay registered. Adds the CI `rg` share-API guard if not already in PR 7. Re-GET last-upload ACLs including inherited.
+- **Description:** Undo builds a reverse plan and requires a **second typed plan id**. Never auto-starts re-downloads. **Refuses** if the reverse would drop any blob to zero verified replicas or breach `staging_reserve`. Reverse-plan uses `we_created` + stored `dest_remote_ref`. Doctor non-zero exit codes documented, including OneDrive/DriveFS installed but no overlay registered. Adds the CI `rg` share-API guard if not already in PR 7. Re-GET last-upload ACLs including inherited. This PR is the last **P0 no-data-loss** gate before TUI/NL.
 
 ### PR 14 — Polish for usable MVP
 
 - **Title:** `docs+ux: README walkthrough, example config, progress, release workflow`
 - **Files/components:** `README.md` Windows walkthrough (gaming clips, 4 GiB case), `configs/examples/gaming-clips.yaml` finalized, `indicatif` progress, `.github/workflows/release.yml` producing `portage.exe`, `portage plan show` readable table, `CONTRIBUTING.md`
 - **Depends on:** PR 13
-- **Description:** An engineer following the README on Windows can connect OneDrive + Drive, index, see dups and capacity, produce a plan, and apply it safely. No new providers. Tags v0.1.0.
+- **Description:** An engineer following the README on Windows can connect OneDrive + Drive, index, see dups and capacity, produce a plan, and apply it safely. No new providers. Tags the **safety MVP**. TUI and NL are the next two PRs, not this one.
 
-**Out of MVP (follow-on, not in the 14):** Dropbox, S3, SMB; USN incremental; TUI; implementing `--allow-cloud-delete` (flag exists, rejected); `preserve_relpath`; ffprobe-rich media; FTS5 search; background daemon; complete (non-greedy) planner search.
+### PR 15 — ratatui TUI (Release 1, after safety MVP)
+
+- **Title:** `feat(tui): portage-tui inventory and plan review`
+- **Files/components:** `crates/portage-tui/**`, workspace member add, config `tui:` theme/keybinds, README TUI section
+- **Depends on:** PR 14 (must not start before PR 13 undo is merged)
+- **Description:** Second binary `portage-tui`. Color capacity / collections / dups / plan review. Hotkeys expand ops and highlight residuals near reserve. **Apply launches the typed plan-id modal** — no hidden confirm, no executor bypass. Engine CLI remains fully scriptable without the TUI. Does not block or rewrite PRs 1–13.
+
+### PR 16 — Natural-language / Grok layer
+
+- **Title:** `feat(nl): portage ask compiles utterances to policy + dry-run plan`
+- **Files/components:** `crates/portage-nl/**` (`LlmProvider`, `intent.rs`, `compile.rs`, `providers/grok.rs`), CLI `ask.rs`, config `nl:`, tests with recorded JSON (no live `XAI_API_KEY` in CI)
+- **Depends on:** PR 10 (planner) at minimum; prefer PR 12 so a compiled plan is apply-able. A **read-only** stub (search/dups/list only) may land after PR 5.
+- **Description:** Grok-first (`XAI_API_KEY`, `https://api.x.ai/v1`, model `grok-4.5` pending docs.x.ai check). `Intent` JSON schema. Compile rules: prefer vs required, `ExtraLocalOnly` dedup, `data_dir` reject. Fixture: the photo-consolidation utterance produces a plan that does not apply and does not emit cloud deletes. **`portage-nl` has no `Executor` dependency.** Apply remains `portage apply <id>`.
+
+**Out of Release 1:** everything in [Future releases](#future-releases) — M365/SharePoint, Dropbox/S3/SMB, `--allow-cloud-delete` implementation, USN, ffprobe, FTS5, extra LLM vendors, Android/other OS, VM isolation, `preserve_relpath`, complete planner search, daemon, published OAuth client id.

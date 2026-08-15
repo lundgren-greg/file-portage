@@ -10,14 +10,14 @@
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
 | **Remote** | `origin` → https://github.com/lundgren-greg/file-portage.git |
-| **Status** | Design approved. Implementation not started. Next: PR 1. |
+| **Status** | Design approved (user Qs resolved 2026-08-14). Implementation not started. Next: PR 1. |
 | **Updated** | 2026-08-14 |
 
 ---
 
 ## Goal
 
-Ship a Windows-first CLI (`portage`) that inventories local disks, Google Drive, and OneDrive, then produces a user-confirmed, space-safe shuttle plan so gaming clips and other libraries can live where the user asked — locally and/or on the cloud with more free space — without filling a 4 GiB-free disk, deleting the last copy, corrupting a multi-GB file, or making anything public.
+Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`) that inventories local disks, Google Drive, and personal OneDrive, then produces a user-confirmed, space-safe shuttle plan so gaming clips and other libraries can live where the user asked — locally and/or on the cloud with more free space — **without losing files**, filling a 4 GiB-free disk, deleting the last copy, corrupting a multi-GB file, or making anything public. NL (Grok first) proposes; it never applies.
 
 ---
 
@@ -32,9 +32,10 @@ Ship a Windows-first CLI (`portage`) that inventories local disks, Google Drive,
 
 ## Next steps (ordered)
 
-1. PR 1 — Cargo workspace, eight crate stubs, `portage --help`, `portage init`, copy example config, rust-toolchain. CI `cargo` steps start running.
-2. Follow PRs 2–14 exactly as written. Merge gates for planner PRs: P-space and P-last-copy tests.
-3. Keep this file's **Stopped at** current.
+1. PR 1 — Cargo workspace, eight crate stubs, `portage --help`, `portage init` (measure C:, recommend `data_dir` if C: < 8 GiB), copy example config, rust-toolchain. CI `cargo` steps start running.
+2. Follow PRs 2–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests.
+3. PR 14 polish → PR 15 `portage-tui` → PR 16 `portage ask` / Grok.
+4. Keep this file's **Stopped at** current.
 
 ---
 
@@ -46,19 +47,17 @@ Ship a Windows-first CLI (`portage`) that inventories local disks, Google Drive,
 
 ---
 
-## Open questions (for user)
+## Resolved questions (user, 2026-08-14 — final)
 
-Recommendations from the design are the current defaults. Change them here if the user answers otherwise.
-
-| # | Question | Why it matters | Answer |
-|---|----------|----------------|--------|
-| 1 | Ship a public OAuth client id or BYO? | Live Drive/Graph login | **BYO in v1** (recommended) |
-| 2 | OneDrive personal only, or M365/SharePoint too? | Graph tenant + site drives | **Personal `/me/drive` in v1** |
-| 3 | Gaming Clips `keep_local: prefer` or `required`? | Tight disk vs failed plans | **prefer + warning** |
-| 4 | `undo` auto-redownload or reverse-plan confirm? | Space + safety | **reverse plan + typed id** |
-| 5 | Auto-relocate catalog off C: or prompt? | Catalog on a full C: | **`init` measures and prompts** |
-| 6 | Google scope `drive` vs `drive.file`? | Cannot inventory existing clips with `drive.file` | **full `drive`** |
-| 7 | TUI in MVP? | Scope | **No. Post-MVP.** |
+| # | Question | Answer |
+|---|----------|--------|
+| 1 | OAuth client ids | **BYO in R1:** `PORTAGE_GOOGLE_CLIENT_ID`, `PORTAGE_MS_CLIENT_ID` |
+| 2 | OneDrive scope | **Personal `/me/drive` in Release 1.** M365/SharePoint = **Release 2** |
+| 3 | Interaction / keep_local | **LLM front door (Grok first).** Compiles to policy + plan. **Never applies.** Gaming Clips default `prefer` + warning; “must stay on C:” → `required`. Browser PKCE UX. |
+| 4 | Undo / data loss | **No data loss = R1 P0.** Reverse-plan + second typed id. Refuse last-copy or reserve breach. Never auto-redownload. |
+| 5 | Catalog location | `init` measures C:. If < 8 GiB, recommend largest non-overlay volume. NL may confirm `data_dir`. Engine rejects unsafe dirs. No silent move. |
+| 6 | Google scope | **Full `drive`.** Consent copy explains why `drive.file` cannot inventory existing clips. |
+| 7 | TUI | **`portage-tui` in R1 after safety MVP (PR 15).** Color/hotkeys. Does not block PRs 1–13. |
 
 ---
 
@@ -100,8 +99,11 @@ No `portage` binary yet.
 | PR 2–5 local inventory | Useful on D: of clips before any cloud |
 | PR 6–8 Drive + OneDrive read | Unified inventory, still no mutations |
 | PR 9–10 planner dry-run | 4 GiB fixture, no writes |
-| PR 11–12 confirmed apply | First real transfers |
-| PR 13–14 undo / doctor / polish | v0.1.0 |
+| PR 11–13 confirmed apply + undo | First real transfers; P0 no-data-loss gate |
+| PR 14 polish | Safety MVP tag |
+| PR 15 `portage-tui` | Color plan review; typed-id apply |
+| PR 16 `portage ask` / Grok | NL → policy + plan; never applies |
+| Release 2+ | M365/SharePoint, Dropbox/S3/SMB, extra LLMs — see design Future releases |
 
 ---
 
@@ -115,6 +117,7 @@ No `portage` binary yet.
 | 2026-08-14 | Cloud-to-cloud is always a local shuttle. Placeholders are not replicas. |
 | 2026-08-14 | Apply requires typing the plan id. Last-copy + private ACL + staging reserve are non-negotiable. |
 | 2026-08-14 | Design approved after 3 review rounds. Source of truth: `docs/design.md`. |
+| 2026-08-14 | User resolved open questions: BYO OAuth; personal OneDrive in R1 / M365 in R2; Grok-first NL never applies; no-data-loss P0; undo = reverse-plan + second id; init+NL catalog recommendation with engine reject; full Google `drive`; TUI PR 15 after safety MVP. |
 
 ---
 
@@ -135,7 +138,8 @@ When starting a new agent/chat session:
 - Commit secrets, tokens, or real file inventories (use `samples/private/` locally; gitignored).
 - Add share-link / `anyoneWithLink` / public ACL helpers. Ever.
 - Hydrate OneDrive or DriveFS placeholders.
-- Auto-apply plans. No daemon in MVP.
+- Auto-apply plans. No daemon in R1. **LLM proposes, never applies.**
+- Start TUI (PR 15) or NL compile-to-plan (PR 16) before PR 13 undo is merged.
 - Skip the planner property tests (P-space, P-last-copy).
 - Force-push or rewrite history on `main` after the remote exists without asking.
 - Implement PRs out of order unless the design marks them independent (PR 6 can proceed after PR 4).

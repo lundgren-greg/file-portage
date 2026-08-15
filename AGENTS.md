@@ -21,8 +21,11 @@ This repo is a **greenfield** app. The approved design is [`docs/design.md`](doc
 - **Never** open OneDrive / DriveFS placeholders. Overlay roots are not local replicas.
 - **Never** delete a last *verified* copy. Suspect replicas do not count.
 - **Never** apply a plan without the user typing the exact plan id.
+- **LLM proposes, never applies.** `portage-nl` / `portage ask` may emit policy + a dry-run plan. It must not call the executor, delete, evict, or upload.
+- No data loss is Release 1 P0. Do not start TUI (PR 15) or NL compile-to-plan (PR 16) before PR 13 undo.
 - Planner and executor must keep local free space ≥ `staging_reserve` **during** every op.
 - Delete requires a `LastCopyGuard` permit. There is no public `delete(path)`.
+- `undo` is reverse-plan + second typed id. Refuse if reverse would drop a blob to zero verified replicas or breach reserve.
 
 ## Layout (after PR 1)
 
@@ -35,6 +38,8 @@ crates/portage-media/
 crates/portage-engine/
 crates/portage-cli/        # [[bin]] name = "portage"
 crates/portage-sim/
+crates/portage-tui/        # PR 15
+crates/portage-nl/         # PR 16; no Executor dependency
 configs/examples/
 docs/
 migrations/

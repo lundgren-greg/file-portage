@@ -2,16 +2,28 @@
 
 Implement from [design.md](design.md). This file is the product checklist, not a substitute for the design.
 
-## MVP (PRs 1–14) — usable on a 4 GiB-free Windows box
+## Release 1 P0 — no data loss (PRs 1–13)
+
+These are not optional polish. They ship before TUI and before NL compile-to-plan.
+
+- [ ] Last verified copy is never deleted. Suspect ≠ replica.
+- [ ] Verify (BLAKE3 local / native digest cloud) before a dest counts and before any evict.
+- [ ] No apply without typing the exact plan id. LLM cannot apply.
+- [ ] Dual SpaceDrift preflight; trough ≥ `staging_reserve`.
+- [ ] `undo` = reverse plan + second typed id; refuse if reverse drops a blob to 0 verified replicas or breaches reserve. Never auto-redownload.
+- [ ] Private-only uploads; inherited anyone fails; `we_created` compensation delete.
+- [ ] Placeholders / overlay roots never opened or counted as replicas.
+
+## Safety MVP (PRs 1–14) — usable on a 4 GiB-free Windows box
 
 ### Inventory
 
-- [ ] `portage init` — data dir, default config, lock file. Warn if `C:` has less than 8 GiB free and offer `data_dir` on another volume.
+- [ ] `portage init` — measure `C:` free. If `< 8 GiB`, recommend the largest non-overlay volume (`D:\PortageData`). No silent move. Engine rejects `data_dir` on free < 8 GiB or overlay / Cloud Filter.
 - [ ] Register local roots (`provider add local`). Refuse OneDrive / DriveFS overlay roots and Cloud Filter volumes.
 - [ ] Walk local NTFS without following junctions out of root. Never open Files On-Demand / DriveFS streamed files.
 - [ ] Incremental BLAKE3 of `LocalFull` files only (`ntfs_file_id + size + mtime` skip).
 - [ ] Google Drive list/delta + quota (`'me' in owners`, ignore Docs/Sheets/shortcuts-as-content).
-- [ ] OneDrive Graph delta + quota (personal `/me/drive` only).
+- [ ] OneDrive Graph delta + quota (personal `/me/drive` only). M365/SharePoint is Release 2.
 - [ ] Unified catalog: files, proto-blobs, verified/suspect replicas, provider checksum bindings.
 - [ ] `search`, `list --collection`, `dups` (confirmed `ContentId` groups vs name+size suspects).
 - [ ] `capacity` — used / free / quota / staging reserve.
@@ -48,13 +60,20 @@ Implement from [design.md](design.md). This file is the product checklist, not a
 ### Safety / ops
 
 - [ ] Tokens in OS keyring; Windows fallback `%data_dir%/tokens.dpapi`. Never YAML.
-- [ ] `undo` builds a reverse plan and requires a second typed id.
+- [ ] OAuth UX: open browser → pick Google/Microsoft account → approve → return. BYO `PORTAGE_GOOGLE_CLIENT_ID` / `PORTAGE_MS_CLIENT_ID`. Full Google `drive` scope; consent copy explains why `drive.file` cannot inventory existing clips.
+- [ ] `undo` builds a reverse plan and requires a second typed id; refuses last-copy / reserve breaches.
 - [ ] `doctor` — catalog integrity, overlay detection, tokens, `NeedsAttention`, last-upload ACL recheck.
 - [ ] CI `rg` forbids share-link / `anyoneWithLink` endpoints in provider code.
 - [ ] No telemetry. No public-link feature.
 
-## v1 (after MVP)
+## Release 1 after safety MVP (PRs 15–16)
 
+- [ ] **PR 15** `portage-tui` (ratatui): color inventory/plan review, hotkeys, configurable theme. Apply still requires typing the plan id. Does not block PRs 1–13.
+- [ ] **PR 16** `portage ask` / `portage-nl`: Grok first (`XAI_API_KEY`, `https://api.x.ai/v1`, `grok-4.5` — re-check docs.x.ai). `LlmProvider` trait for later vendors. Compiles utterances → policy + dry-run plan. **LLM never applies.** Optional read-only stub after PR 5 (search/dups/list only).
+
+## Future releases (not R1)
+
+- [ ] Microsoft 365 / SharePoint site drives (**Release 2**).
 - [ ] Dropbox provider.
 - [ ] S3-compatible (Backblaze B2, Wasabi, AWS) with block-public-ACLs.
 - [ ] SMB / NAS provider.
@@ -62,15 +81,15 @@ Implement from [design.md](design.md). This file is the product checklist, not a
 - [ ] USN Journal incremental local index.
 - [ ] Optional `ffprobe` for duration/resolution when `PORTAGE_FFPROBE` is set.
 - [ ] FTS5 search.
-- [ ] Microsoft 365 / SharePoint site drives (if product decision says so).
+- [ ] Extra LLM providers (OpenAI, Anthropic, local).
+- [ ] Android / other OS clients.
+- [ ] VM isolation of transfers or the catalog (idea only).
+- [ ] Published OAuth client id.
 
 ## Later / non-goals for now
 
 - Real-time sync daemon, Cloud Filter provider, FUSE.
-- TUI (`ratatui`) or GUI — another binary on the same crates.
 - Chunk-level dedup, transcoding, backup versioning / ransomware timelines.
-- Shipping a verified public OAuth client id (v1 is bring-your-own).
-- iOS / Android.
 - Encryption-at-rest of user file contents (not a zero-knowledge vault).
 - Any "anyone with the link" or third-party cloud-to-cloud SaaS.
 

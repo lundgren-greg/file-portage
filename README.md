@@ -5,7 +5,7 @@
 
 **Portage** inventories local disks and cloud accounts, then shuttles files between them under a user-confirmed plan. The binary is `portage`. The GitHub repo is `file-portage` so it does not collide with Gentoo Portage.
 
-Gaming clips (and anything else) that are split across a nearly full SSD, OneDrive, and Google Drive become one catalog. You write a placement policy — keep clips local **and** on whichever cloud has more free space — and Portage produces a dry-run plan that never drives local free space below a reserved staging budget, never deletes the last verified copy, and never creates a public share.
+Gaming clips (and anything else) that are split across a nearly full SSD, OneDrive, and Google Drive become one catalog. You can write a placement policy — or **say it** (“keep my clips on D: and whichever cloud has more free space”) and Grok compiles that into policy plus a dry-run plan. Portage never drives local free space below a reserved staging budget, never deletes the last verified copy, and never creates a public share. **The LLM never applies.** You type the plan id.
 
 ## Why this project
 
@@ -23,6 +23,9 @@ Explorer, rclone, and the official sync clients can copy bytes. They will also h
 - YAML collections and placement policies (`keep_local`, `most_free` cloud, replica count).
 - Space-safe planner with residual free space after every step. User types the plan id to apply.
 - Serial executor, crash journal, last-copy permit, private-only ACL assert, no silent overwrite.
+- **No data loss is Release 1 P0.** Undo is a reverse plan you confirm with a second plan id.
+- Natural language (`portage ask`) via Grok first (`XAI_API_KEY`). Compiles intent → plan. Never applies.
+- `portage-tui` (ratatui) after the safety MVP: color, hotkeys, plan review. Apply still types the plan id.
 
 ## Architecture
 
@@ -37,9 +40,11 @@ file-portage/
     portage-engine/     # index, policy, planner, executor
     portage-cli/        # `portage` binary
     portage-sim/        # SimulatedWorld + property tests
+    portage-tui/        # PR 15 — ratatui, after safety MVP
+    portage-nl/         # PR 16 — Grok-first ask; never applies
   configs/examples/     # gaming-clips.yaml
-  docs/design.md        # approved design + 14-PR plan
-  docs/FEATURES.md      # MVP / v1 / later
+  docs/design.md        # approved design + PR plan
+  docs/FEATURES.md      # R1 P0 / safety MVP / TUI+NL / future releases
 ```
 
 The workspace does not exist yet. PR 1 creates it. Until then CI skips Cargo steps.
@@ -50,6 +55,7 @@ The workspace does not exist yet. PR 1 creates it. Until then CI skips Cargo ste
 - PowerShell 7+ (`pwsh`) for helper scripts.
 - Rust stable (after PR 1).
 - Bring-your-own OAuth client ids: `PORTAGE_GOOGLE_CLIENT_ID`, `PORTAGE_MS_CLIENT_ID`.
+- Optional NL: `XAI_API_KEY` (Grok). Not required for CLI/TUI.
 
 ## Build and test
 
@@ -74,9 +80,11 @@ portage plan --collection "Gaming Clips"
 portage plan show
 portage apply file-plan-7f3c   # type the plan id; y/yes is rejected
 portage status
+portage ask "keep my gaming videos on D: and the cloud with more free space"
+portage-tui                    # after PR 15
 ```
 
-Empty, `y`, or `yes` is **rejected** at apply. Confirmation is the exact plan id.
+Empty, `y`, or `yes` is **rejected** at apply. Confirmation is the exact plan id. `portage ask` only prints a plan.
 
 ## Safety invariants
 
@@ -107,8 +115,10 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 | Local index + dups (PR 2–5) | Not started |
 | Drive + OneDrive inventory (PR 6–8) | Not started |
 | Planner dry-run (PR 9–10) | Not started |
-| Confirmed apply (PR 11–12) | Not started |
-| Undo / doctor / polish (PR 13–14) | Not started |
+| Confirmed apply + undo (PR 11–13) | Not started — P0 no-data-loss |
+| Polish (PR 14) | Not started |
+| TUI `portage-tui` (PR 15) | After safety MVP |
+| NL `portage ask` / Grok (PR 16) | After planner; never applies |
 
 ## License
 
