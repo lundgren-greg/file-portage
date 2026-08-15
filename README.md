@@ -53,7 +53,7 @@ The drive is identified by **volume serial**, not letter. If it is unplugged, an
 
 ## Status
 
-**Design approved. Implementation not started.** An agent should execute [docs/design.md](docs/design.md) beginning at **PR 1**. See [PROJECT.md](PROJECT.md) and [docs/FEATURES.md](docs/FEATURES.md).
+**Design approved. Implementation not started.** An agent should execute [docs/design.md](docs/design.md) beginning at **PR 1**. See [PROJECT.md](PROJECT.md), [docs/FEATURES.md](docs/FEATURES.md), and the [wiki](docs/wiki/README.md) ([GitHub Wiki tab](https://github.com/lundgren-greg/portage-app/wiki)).
 
 ## Key features (Release 1)
 
