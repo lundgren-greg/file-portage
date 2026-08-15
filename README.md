@@ -3,26 +3,52 @@
 [![CI](https://github.com/lundgren-greg/file-portage/actions/workflows/ci.yml/badge.svg)](https://github.com/lundgren-greg/file-portage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Portage** inventories local disks and cloud accounts, then shuttles files between them under a user-confirmed plan. The binary is `portage`. The GitHub repo is `file-portage` so it does not collide with Gentoo Portage.
+**Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. The GitHub repo is `file-portage` so it does not collide with Gentoo Portage.
 
 **Author / maintainer:** [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`). Nothing lands on `main` except through a pull request he reviews.
 
-Gaming clips (and anything else) that are split across a nearly full SSD, OneDrive, and Google Drive become one catalog. You can write a placement policy — or **say it** (“keep my clips on D: and whichever cloud has more free space”) and Grok compiles that into policy plus a dry-run plan. Portage never drives local free space below a reserved staging budget, never deletes the last verified copy, and never creates a public share. **The LLM never applies.** You type the plan id.
+When the same library is split across a full internal disk and two clouds, Portage builds one catalog, applies your placement rules, and sequences copy / shuttle / evict so local free space never goes below a reserved staging budget. It never deletes the last verified copy and never creates a public share. You can write the rules in YAML or **say them**; Grok compiles that into a dry-run plan. **The LLM never applies.** You type the plan id.
 
 ## Why this project
 
-Explorer, rclone, and the official sync clients can copy bytes. They will also hydrate a OneDrive placeholder onto a disk with 4 GiB free, overwrite a different file that happens to share a name, or leave a truncated video looking complete after a dropped connection. Portage is a **control plane** (catalog, policy, planner, journal) plus a **private data plane** (resumable upload/download with checksum verify). Cloud-to-cloud is always a local shuttle. Nothing is applied until you type the plan id.
+Explorer, rclone, and the official sync clients can copy bytes. They will also hydrate a cloud placeholder onto a disk with a few gigabytes free, overwrite a different file that happens to share a name, or leave a truncated object looking complete after a dropped connection. They have no notion of “this USB disk is only here so two clouds can pass a file,” or “keep a replica on the external drive *and* on whichever cloud still has quota.”
+
+Portage is a **control plane** (catalog, policy, planner, journal) plus a **private data plane** (resumable upload/download with checksum verify). Cloud-to-cloud is always a local shuttle — often via an external disk when the internal volume is too small. Nothing is applied until you type the plan id.
+
+## Use cases
+
+These are capabilities, not product verticals. If the files exist as bytes on a disk or in a connected account, they are in scope.
+
+**See everything in one place.** Index internal volumes, plugged-in external drives, Google Drive, and OneDrive (via their APIs — not desktop placeholders). Search, list by collection, and group confirmed duplicates by content hash.
+
+**Say where a class of files should live.** Keep them on a chosen internal volume, on an external drive, in a specific cloud, on whichever connected cloud has more free space, or some combination (replica count, pin, cloud-only).
+
+**Move bytes without filling the machine.** The planner prints residual free space after every step, including during a shuttle. Default reserve is 1 GiB. If the internal disk cannot hold the hop, Portage uses a connected external drive as staging instead of failing or writing the machine to zero bytes.
+
+**Use an external drive as a hop *or* as home.** Same disk, two roles (you can enable both):
+
+| Role | What it means |
+| --- | --- |
+| **Shuttle** | Intermediate transfer location. Download here from cloud A, verify, upload to cloud B, delete the staging file. The drive is not a replica just because bytes passed through it. |
+| **Final** | Storage destination. Files may live here as a verified copy, alone or next to a cloud replica. |
+
+The drive is identified by **volume serial**, not letter. If it is unplugged, any plan that needs it stops (`VolumeOffline`). An absent disk never authorizes deleting the last remaining copy.
+
+**Confirm before anything mutates.** `portage plan` is a dry run. `portage apply` rejects `y` / `yes` / Enter. Undo is a reverse plan you confirm with a second id, and it refuses if that reverse would lose the last copy or breach the reserve.
+
+**Ask in plain language (after the safety MVP).** `portage ask "keep these on the external drive and whichever cloud has more space"` compiles to policy + a plan. It does not apply.
 
 ## Status
 
 **Design approved. Implementation not started.** An agent should execute [docs/design.md](docs/design.md) beginning at **PR 1**. See [PROJECT.md](PROJECT.md) and [docs/FEATURES.md](docs/FEATURES.md).
 
-## Key features (MVP)
+## Key features (Release 1)
 
-- Index local NTFS volumes **and** Google Drive / OneDrive via their APIs (not desktop placeholders).
+- Index local NTFS volumes (internal and removable) **and** Google Drive / OneDrive via their APIs.
+- External / USB volumes as `shuttle`, `final`, or both.
 - Content-addressed identity (BLAKE3). Provider checksums are bindings only.
-- Capacity view per volume and per cloud, including a 1 GiB staging reserve.
-- YAML collections and placement policies (`keep_local`, `most_free` cloud, replica count).
+- Capacity view per volume and per cloud, including the staging reserve.
+- YAML collections and placement policies.
 - Space-safe planner with residual free space after every step. User types the plan id to apply.
 - Serial executor, crash journal, last-copy permit, private-only ACL assert, no silent overwrite.
 - **No data loss is Release 1 P0.** Undo is a reverse plan you confirm with a second plan id.
@@ -37,14 +63,14 @@ file-portage/
     portage-core/       # ids, hashing, paths, config
     portage-catalog/    # SQLite WAL
     portage-auth/       # OAuth PKCE + DPAPI/keyring
-    portage-providers/  # local + Drive + Graph (no share APIs)
-    portage-media/      # cheap MP4 probe
+    portage-providers/  # local (incl. removable) + Drive + Graph
+    portage-media/      # cheap header probe
     portage-engine/     # index, policy, planner, executor
     portage-cli/        # `portage` binary
     portage-sim/        # SimulatedWorld + property tests
     portage-tui/        # PR 15 — ratatui, after safety MVP
     portage-nl/         # PR 16 — Grok-first ask; never applies
-  configs/examples/     # gaming-clips.yaml
+  configs/examples/     # policy fixtures
   docs/design.md        # approved design + PR plan
   docs/FEATURES.md      # R1 P0 / safety MVP / TUI+NL / future releases
 ```
@@ -73,16 +99,17 @@ cargo fmt --all -- --check
 ```powershell
 portage init
 portage provider add local --root D:\ --id local-d
+portage provider add local --root E:\ --id ext-media --role both
 portage provider add google-drive
 portage provider add onedrive
 portage index
 portage capacity
 portage dups
-portage plan --collection "Gaming Clips"
+portage plan
 portage plan show
 portage apply file-plan-7f3c   # type the plan id; y/yes is rejected
 portage status
-portage ask "keep my gaming videos on D: and the cloud with more free space"
+portage ask "keep these on the external drive and the cloud with more free space"
 portage-tui                    # after PR 15
 ```
 
@@ -90,9 +117,9 @@ Empty, `y`, or `yes` is **rejected** at apply. Confirmation is the exact plan id
 
 ## Safety invariants
 
-- Last verified copy is never deleted.
+- Last verified copy is never deleted. An unplugged disk does not count.
 - Every copy is checksum-verified before it counts as a replica.
-- Local free space never goes below `staging_reserve` (default 1 GiB) at any step, including during a shuttle.
+- Local free space (internal *and* shuttle volume) never goes below `staging_reserve` (default 1 GiB) at any step.
 - OneDrive / Google Drive for Desktop placeholders are not replicas and are never opened.
 - Uploads are private. Inherited "anyone with the link" on a parent folder fails the op; a file we created is deleted.
 - No telemetry. Tokens live in the OS credential store, never in YAML.
@@ -115,7 +142,7 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 | Standard repo kit | Done |
 | Approved design + feature set | Done — `docs/design.md` |
 | PR 1 workspace + CLI stub | Next |
-| Local index + dups (PR 2–5) | Not started |
+| Local index + dups, incl. removable volumes (PR 2–5) | Not started |
 | Drive + OneDrive inventory (PR 6–8) | Not started |
 | Planner dry-run (PR 9–10) | Not started |
 | Confirmed apply + undo (PR 11–13) | Not started — P0 no-data-loss |
@@ -125,4 +152,4 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Greg (`@lundgren-greg`).

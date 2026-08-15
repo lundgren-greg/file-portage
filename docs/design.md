@@ -24,7 +24,7 @@ Rejected names: Ferry (too generic, collisions), Stow (too cute, unclear), Manif
 
 ## Overview
 
-Users have large personal libraries — especially game capture videos of 50 MiB to several GiB — split across local NTFS volumes, Microsoft OneDrive, and Google Drive, with more providers coming. There is no unified inventory, no safe way to express “keep gaming clips on the local SSD *and* on whichever cloud has more free space,” and no tool that will actually move those bytes without (a) filling a disk that has only ~4 GiB free, (b) deleting the last copy, (c) corrupting a multi-gigabyte file on a dropped connection, or (d) accidentally creating an “anyone with the link” object.
+Users have large personal libraries split across internal NTFS volumes, removable disks, Microsoft OneDrive, and Google Drive, with more providers coming. There is no unified inventory, no safe way to express “keep these files on this disk *and* on whichever cloud has more free space,” or “use the USB drive only as a hop,” and no tool that will actually move those bytes without (a) filling a disk that has only ~4 GiB free, (b) deleting the last copy, (c) corrupting a multi-gigabyte file on a dropped connection, or (d) accidentally creating an “anyone with the link” object.
 
 Portage is a new standalone application (greenfield repo, not an extension of any existing scripts tree). It indexes every connected location into a local SQLite catalog using content-addressed identity, evaluates user placement policies, and produces an explicit, user-confirmed plan of copy / move / evict / shuttle operations. The planner is a space-aware sequencer: it will upload-and-evict to make room, then download, and it will refuse any plan that would drive local free space below a reserved staging budget at any step. The executor verifies checksums before it will consider a replica real, journals every mutation for crash resume, and never calls a public-sharing API.
 
@@ -127,6 +127,7 @@ Also in Release 1:
 | K21 | **TUI after safety MVP.** `portage-tui` (ratatui) is PR 15. Color, hotkeys, configurability. It reviews plans and can *launch* apply; the user still types the plan id. PRs 1–13 are not blocked on it. | Fun surface without putting chrome in front of last-copy. |
 | K22 | **Catalog location: `init` recommends; NL may confirm; engine rejects unsafe dirs.** If `C:` free < 8 GiB, recommend the largest non-overlay volume (`D:\PortageData`). No silent move. Reject `data_dir` on a volume with free < 8 GiB or that is an overlay / Cloud Filter mount. | Catalog on a full C: or a DriveFS mount is a Sev-0 footgun. |
 | K23 | **Undo is reverse-plan + second typed plan id.** Never auto-start re-downloads. Refuse if the reverse plan would drop any blob to zero verified replicas or breach staging reserve. | Undo that silently re-downloads can fill the disk; undo that deletes a last copy is data loss. |
+| K24 | **Removable volumes are first-class locations.** An external / USB drive can be a **final** dest, a **shuttle** hop (staging when the internal disk cannot hold a transfer), or both. Identity is **volume serial**, not drive letter. Unplugged → fail closed (`VolumeOffline`); do not invent a last copy on a missing disk. | Internal SSDs are often the 4 GiB bottleneck. The portage *is* often an external disk. |
 
 ---
 
@@ -501,7 +502,39 @@ if live - bytes_held_during_N < staging_reserve:
 
 Do **not** use `live < residual_during - slack` as the only gate. `residual_during` is already `start − size` for downloads/shuttles, so that comparison only fires after live has already fallen to the *end* of the op — too late to protect the reserve. Worked counter-example: after L2 evict, sim free is 7.50; Windows Update consumes 1.50 (live = 6.00). G1 (2.20) has `residual_during = 5.30`. The old gate `6.00 < 5.30 − 0.06` is false and would start the download; after G1+O1+G2 live would be **0.00**, below the 1.00 GiB reserve. Predicate (1) `6.00 + 0.06 >= 7.50` is false → pause. Phase 4 still asserts the *plan* troughs ≥ reserve; that does not replace this live check.
 
-**Staging dir** must live on a configured local volume (default: the volume with the most free space that is not a cloud overlay). Temp files for a dest on volume X **must** be created on volume X so rename is atomic. Cross-volume “rename” is a copy and is forbidden for finalize.
+**Staging dir** must live on a configured local volume. Default pick order: (1) a connected volume whose role includes `shuttle` with the most free space, (2) otherwise the non-overlay volume with the most free space. Temp files for a dest on volume X **must** be created on volume X so rename is atomic. Cross-volume “rename” is a copy and is forbidden for finalize.
+
+### Removable / external volumes
+
+External HDDs, USB SSDs, and other removable NTFS volumes are the same `local` provider with extra metadata. They are **not** a later provider type.
+
+```yaml
+providers:
+  - id: ext-media
+    type: local
+    root: "E:\\"                    # current mount; identity is volume serial
+    removable: true
+    roles: [shuttle, final]         # shuttle | final | both
+```
+
+| Role | Meaning |
+| --- | --- |
+| `final` | Eligible as `prefer_local` / `required` dest. Files may live here as a verified replica. |
+| `shuttle` | Eligible as the local hop for cloud-to-cloud and as `staging_dir` when internal usable space is too small. After the upload verifies, staging on this volume is deleted. |
+| both | Default for a user-added external disk. |
+
+Rules:
+
+1. **Identity = volume serial** (`GetVolumeInformation` serial). Drive letter changes (`E:` → `F:`) update `locations.root`; they do not create a second location.
+2. **Offline is fail-closed.** If a plan op’s src, dest, or staging volume is not mounted, `plan` / `apply` / `resume` stop with `Error::VolumeOffline` and the volume’s label/serial. Do not skip the op. Do not count an unplugged disk as a verified replica that can authorize a last-copy delete.
+3. **Shuttle on external does not make it a replica.** Bytes sitting in `.portage-staging` on `E:` are journal `Partial`, not `verified`.
+4. **Safe removal.** While any journal op is `Transferring` / `Verifying` on that serial, `doctor` and `status` say do not eject. Sudden unplug → resume rules (rehash tmp or restart); never evict a last copy because staging vanished.
+5. **Refuse overlays.** Same K6 checks. A DriveFS virtual letter is not an external disk.
+6. **Capacity.** `GetDiskFreeSpaceExW` on the volume root. Shuttle plans must keep *that* volume’s trough ≥ `staging_reserve` too.
+
+`portage provider add local --root E:\ --id ext-media --role both` records serial + roles. `portage capacity` shows internal vs removable separately.
+
+Worked case: internal `D:` has 4 GiB free (usable 3 GiB). File X is 8 GiB on Google, policy wants it on OneDrive only. `E:` (2 TiB USB, role `shuttle`) is mounted. Planner shuttles X via `E:\.portage-staging`, not via `D:`. If `E:` is unplugged, the plan is `Unsatisfiable` with “plug in ext-media (serial …) or free 8 GiB on D:”.
 
 ### Placement policies
 
@@ -962,7 +995,8 @@ Dropbox, S3-compatible (Backblaze B2, Wasabi, AWS), SMB/NAS, Microsoft 365 / Sha
 | `portage init` | Measure `C:` free. If `C:` < 8 GiB, **recommend** (do not silently use) the largest non-overlay volume as `data_dir` (e.g. `D:\PortageData`). Show the recommendation and wait for accept / `--data-dir`. Reject a chosen dir on a volume with free < 8 GiB or that is an overlay / Cloud Filter mount. Then write config, empty catalog, lock file. |
 | `portage provider add google-drive` | Open the system browser → user picks the Google account → approve → return to the CLI. Store token; write provider id into config. Consent copy must say why full `drive` is required (`drive.file` cannot see existing clips). |
 | `portage provider add onedrive` | Same browser PKCE flow for Microsoft personal account (`/me/drive` only). |
-| `portage provider add local --root D:\ --id local-d` | Register a volume |
+| `portage provider add local --root D:\ --id local-d` | Register a fixed volume (`roles: [final]` default) |
+| `portage provider add local --root E:\ --id ext-media --role both` | Register a removable volume as shuttle hop and/or final dest. Stores volume serial. |
 | `portage provider list` | Ids, kind, account, last index, capacity |
 | `portage index [--provider ID]` | Incremental scan + local hash of dirty LocalFull files |
 | `portage search QUERY` | Path / collection / mime substring, SQL LIKE + optional FTS later |
@@ -1747,7 +1781,7 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 - **Title:** `feat(local): NTFS walk with placeholder detection and sync-root exclusion`
 - **Files/components:** `crates/portage-providers/src/{traits,local/**,registry}.rs`, Windows `windows` crate usage, `portage-engine/src/index.rs` (local only), CLI `provider add local`, `index`, `capacity`
 - **Depends on:** PR 3
-- **Description:** Implements `Provider` for local disks. Detectors as specified: OneDrive `UserFolder`; DriveFS `DefaultMountPoint` / `Share` / `SyncTargets`; always exclude `%LOCALAPPDATA%\Google\DriveFS`; refuse `provider add local` when the root *is* an overlay or the volume is DriveFS/Cloud Filter; skip inner overlays when walking `C:\`. Placeholder files recorded as `hydration=placeholder` and never opened. Non-`LocalFull` is not a replica. `GetDiskFreeSpaceExW`. Linux/macOS: walk + `statvfs`, placeholder detection compiles to “always LocalFull.” `doctor` fails if OneDrive/DriveFS is installed and `overlay_roots` is empty. Integration test: temp dir of files, index, see rows.
+- **Description:** Implements `Provider` for local disks **including removable / USB volumes**. Detectors as specified: OneDrive `UserFolder`; DriveFS `DefaultMountPoint` / `Share` / `SyncTargets`; always exclude `%LOCALAPPDATA%\Google\DriveFS`; refuse `provider add local` when the root *is* an overlay or the volume is DriveFS/Cloud Filter; skip inner overlays when walking `C:\`. Record volume serial, bus/removable flag, and `roles: shuttle \| final \| both`. `GetDiskFreeSpaceExW`. Offline removable volumes fail closed (`VolumeOffline`) and do not count as last-copy. Placeholder files recorded as `hydration=placeholder` and never opened. Non-`LocalFull` is not a replica. Linux/macOS: walk + `statvfs`, placeholder detection compiles to “always LocalFull.” `doctor` fails if OneDrive/DriveFS is installed and `overlay_roots` is empty. Integration test: temp dir of files, index, see rows.
 
 ### PR 5 — Incremental local hash and duplicate listing
 
