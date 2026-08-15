@@ -7,8 +7,6 @@
 
 **Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. The GitHub repo is [`portage-app`](https://github.com/lundgren-greg/portage-app) so it does not collide with Gentoo Portage.
 
-**Author / maintainer:** [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`). Nothing lands on `main` except through a pull request he reviews.
-
 When the same library is split across a full internal disk and two clouds — gaming clips, documents, archives, whatever you actually have — Portage builds one catalog, applies your placement rules, and sequences copy / shuttle / evict so local free space never goes below a reserved staging budget. It never deletes the last verified copy and never creates a public share. You can write the rules in YAML or **say them**; Grok compiles that into a dry-run plan. **The LLM never applies.** You type the plan id.
 
 ## Why this project
@@ -146,7 +144,7 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 - Read [PROJECT.md](PROJECT.md) first.
 - Implement in the order in [docs/design.md](docs/design.md) **PR Plan**.
 - Keep CI green.
-- **Contributors** open a pull request and wait for CI. [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`) is the code owner. He can merge his own PRs and push `main` directly.
+- Prefer a pull request and keep CI green.
 
 ## Roadmap (high level)
 
@@ -165,4 +163,4 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Greg (`@lundgren-greg`).
+MIT. See [LICENSE](LICENSE).

@@ -32,5 +32,5 @@ The metaphor is the trail between two lakes: you carry the cargo overland becaus
 | [External drives](External-drives) | USB as hop and/or home |
 | [Decisions](Decisions) | Answers we already locked |
 | [Roadmap](Roadmap) | PR 1 → 16 |
-| [How we work](How-we-work) | Public repo. Others use PRs. Greg can push `main`. |
+| [How we work](How-we-work) | Public repo, usual path is a PR |
 | [For agents](For-agents) | What to do in the next session |

@@ -10,7 +10,7 @@
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
 | **Remote** | `origin` → https://github.com/lundgren-greg/portage-app.git |
-| **Status** | Public. Others use PRs. Greg (`@lundgren-greg`) can push `main` and merge his own PRs. PR 1 is on main. Next: PR 1.5. |
+| **Status** | Public. PR 1 is on main. Next: PR 1.5. |
 | **Updated** | 2026-08-14 |
 
 ---
@@ -29,7 +29,7 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 4. Wiki draft lives in `docs/wiki/`. GitHub Wiki tab needs one “Create the first page” click, then `.\scripts\Publish-Wiki.ps1`.
 5. Ported the brainstorm decisions (`docs/brainstorm.md`): clarify-then-plan agent, **local or online** LLM (Grok default; Ollama/LM Studio), desire + priority `Intent`, redacted catalog digest for online providers.
 6. Plan updated: new **PR 1.5** (JSON-lines logs for Grafana Alloy/Loki, Prometheus-text metrics snapshot, redaction tests, `cargo llvm-cov` ≥80% coverage gate on core/catalog/engine).
-7. **Next:** PR 1 is on `main`. Implementation agent continues at **PR 1.5**, then PR 2. Agents use a branch + pull request. Greg may push `main`. Do not skip ahead to providers or apply.
+7. **Next:** PR 1 is on `main`. Continue at **PR 1.5**, then PR 2. Prefer a branch + pull request. Do not skip ahead to providers or apply.
 
 ---
 
@@ -62,7 +62,7 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 | 5 | Catalog location | `init` measures C:. If < 8 GiB, recommend largest non-overlay volume. NL may confirm `data_dir`. Engine rejects unsafe dirs. No silent move. |
 | 6 | Google scope | **Full `drive`.** Consent copy explains why `drive.file` cannot inventory existing clips. |
 | 7 | TUI | **`portage-tui` in R1 after safety MVP (PR 15).** Color/hotkeys. Does not block PRs 1–13. |
-| 8 | First user of apply | **Greg's machine only.** No published OAuth client, no friend-install push in R1. |
+| 8 | First user of apply | **One personal machine.** No published OAuth client in R1. |
 | 9 | Machines in R1 | **One PC.** Catalog on that host. Multi-machine is later. |
 | 10 | What “organize” means | **LLM conversation clarifies with the user** each time (`portage ask`). Engine default remains placement (where copies live). No autonomous rename/rebuild. |
 | 11 | External drive job | **Both hop and home.** Default `roles: [shuttle, final]`. Each plan chooses how that run uses the disk. |
@@ -129,8 +129,8 @@ No `portage` binary yet.
 | 2026-08-14 | Cloud-to-cloud is always a local shuttle. Placeholders are not replicas. |
 | 2026-08-14 | Apply requires typing the plan id. Last-copy + private ACL + staging reserve are non-negotiable. |
 | 2026-08-14 | Design approved after 3 review rounds. Source of truth: `docs/design.md`. |
-| 2026-08-14 | Repo is **public**. CODEOWNERS `* @lundgren-greg`. |
-| 2026-08-15 | Greg can push `main` and merge his own PRs (`bypass_mode: always`). Others still need a PR + his review + CI. |
+| 2026-08-14 | Repo is **public**. |
+| 2026-08-15 | Maintainer can push `main`. Contributors use PRs + CI. |
 | 2026-08-15 | External / USB volumes are first-class (`shuttle` hop and/or `final` dest; identity = volume serial). README leads with capabilities and names concrete situations (gaming clips **and** docs, archives, full disk, dups) so the audience is not one niche. |
 | 2026-08-14 | User resolved open questions: BYO OAuth; personal OneDrive in R1 / M365 in R2; Grok-first NL never applies; no-data-loss P0; undo = reverse-plan + second id; init+NL catalog recommendation with engine reject; full Google `drive`; TUI PR 15 after safety MVP. |
 | 2026-08-15 | NL is a **clarify-then-plan agent** (desire + priority, ≤3 clarify rounds), **local or online**: Grok default, any OpenAI-compatible localhost (Ollama/LM Studio). Online sees a redacted catalog digest unless `nl.send_paths`. Source: `docs/brainstorm.md`. |
@@ -159,6 +159,5 @@ When starting a new agent/chat session:
 - Auto-apply plans. No daemon in R1. **LLM proposes, never applies.**
 - Start TUI (PR 15) or NL compile-to-plan (PR 16) before PR 13 undo is merged.
 - Skip the planner property tests (P-space, P-last-copy).
-- Push or merge to `main`. Open a pull request; Greg (`@lundgren-greg`) merges.
-- Force-push or rewrite history on `main`.
+- Force-push or rewrite history on `main` without a reason.
 - Implement PRs out of order unless the design marks them independent (PR 6 can proceed after PR 4).

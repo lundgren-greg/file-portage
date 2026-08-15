@@ -1,12 +1,6 @@
 # Contributing
 
-This is Greg's project ([@lundgren-greg](https://github.com/lundgren-greg)).
-External PRs are welcome for bugs and small fixes; larger changes should start as an issue.
-
-**Everyone except Greg** lands on `main` through a pull request. `CODEOWNERS` requires
-`@lundgren-greg` on every path. Greg (`@lundgren-greg`) can push `main` and merge
-his own PRs without a second reviewer. GitHub still will not let anyone *approve*
-their own PR; his bypass is the owner override.
+PRs are welcome for bugs and small fixes. Larger changes should start as an issue.
 
 ## Before you start
 
@@ -17,12 +11,11 @@ their own PR; his bypass is the owner override.
 
 ## Workflow
 
-1. Branch from `main` (Greg may commit on `main`).
+1. Branch from `main`.
 2. Add or update tests with the behavior change.
 3. Run the CI-equivalent commands locally.
 4. Open a PR against `main`. Fill in the PR template.
-5. CI (`Build & Test` on Windows and Ubuntu) must be green.
-6. Wait for Greg (`@lundgren-greg`) to review and merge. Do not merge your own PR unless you are Greg.
+5. CI (`Build & Test` on Windows and Ubuntu) should stay green.
 
 ## PowerShell
 

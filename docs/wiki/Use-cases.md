@@ -21,4 +21,4 @@ It does not autonomously rename files or rebuild folder trees. If you want a des
 
 ## Who this is for (R1)
 
-Greg’s machine. One PC. One Google account, one personal Microsoft account. Other people can read the public repo; they are not the first `apply` user.
+R1 is one PC, one Google account, one personal Microsoft account. The public repo is readable; that install is still the first `apply` target.

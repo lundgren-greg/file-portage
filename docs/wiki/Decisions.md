@@ -1,6 +1,6 @@
 # Decisions
 
-Locked with Greg. Treat these as final until he changes them in a PR or here.
+Treat these as final until a later decision changes them.
 
 | # | Topic | Decision |
 |---|---|---|
@@ -11,7 +11,7 @@ Locked with Greg. Treat these as final until he changes them in a PR or here.
 | 5 | Catalog location | `init` measures C:. If C: < 8 GiB, recommend the largest safe non-overlay volume. NL may confirm. Engine rejects unsafe dirs. No silent move. |
 | 6 | Google scope | Full `drive` so existing files can be inventoried. Consent copy explains why `drive.file` cannot. |
 | 7 | TUI | `portage-tui` (color, hotkeys) after the safety MVP (PR 15). Apply still types the plan id. |
-| 8 | First apply user | Greg’s machine only. |
+| 8 | First apply user | One personal machine. No published OAuth client in R1. |
 | 9 | Machines in R1 | One PC. Multi-machine is later. |
 | 10 | “Organize” | LLM conversation clarifies. Engine default is placement, not rename/rebuild. |
 | 11 | External drive | Both hop and home. Each plan chooses. |

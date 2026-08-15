@@ -22,7 +22,7 @@ binary named `portage`. Until then, do not put app code in `src/`.
 - **No apply without typing the plan id.**
 - **No telemetry.** Tokens never in YAML or git.
 - **Never commit secrets or real file inventories.**
-- **Agents / contributors:** open a PR. Do not push `main` unless you are Greg (`@lundgren-greg`).
+- Prefer a pull request over committing on `main`.
 
 ## Build, test, run
 

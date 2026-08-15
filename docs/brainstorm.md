@@ -1,6 +1,6 @@
 # Portage brainstorm (session context)
 
-For the next agent: read this, then `PROJECT.md` and `docs/design.md`. Do not invent a new architecture. Greg wants to **keep discussing** from here.
+For the next agent: read this, then `PROJECT.md` and `docs/design.md`. Do not invent a new architecture. Discussion can continue from here.
 
 Date: 2026-08-14 / 2026-08-15  
 Local clone: `C:\Repos\portage-app`  
@@ -25,7 +25,7 @@ The fun product: the user states **desire** (what goes where) and **priority** (
 
 ## What we already shipped (docs only — no Rust app yet)
 
-- Repo kit, MIT, Greg owns `main` (PR-only, CODEOWNERS `* @lundgren-greg`)
+- Repo kit, MIT, public `main`
 - Approved design: `docs/design.md` (14–16 PRs)
 - Feature checklist: `docs/FEATURES.md`
 - README with trail hero + use-case table (gaming clips **and** docs/archives/tight disk/dups)
@@ -41,7 +41,7 @@ The fun product: the user states **desire** (what goes where) and **priority** (
 | Topic | Decision |
 | --- | --- |
 | Name | Product **Portage**. Repo **portage-app**. Binary `portage`. Not Gentoo; not “file-*”. |
-| First user | Greg’s machine only |
+| First user | One personal machine |
 | Machines | One PC in R1 |
 | Accounts | One Google, one personal Microsoft |
 | Organize | Agent conversation clarifies. Engine default is **placement**, not rename/rebuild |
@@ -66,7 +66,7 @@ The fun product: the user states **desire** (what goes where) and **priority** (
 - The **gap** is: many **local volumes + clouds**, a **plan**, last-copy, USB as hop or home, no public-link SaaS.
 - Pitch: *You have more than one place. We figure out what should live where, and we will not lose a file doing it.*
 - Simple as an **outcome** (one conversation, one confirm). Not simple if the first screen is YAML.
-- Build for Greg first. Charge later only if strangers run `apply` twice.
+- Build for one real library first. Charge later only if strangers run `apply` twice.
 
 ---
 
@@ -104,7 +104,7 @@ Agent asks if dest, volume, or priority is missing. It does not guess a delete.
 - Open OneDrive / DriveFS placeholders.
 - Treat an unplugged USB as a last copy.
 - Sound like a junk cleaner or a photo/DAM app.
-- Skip ahead of design PR 1 unless Greg asks to keep brainstorming (discussion is fine; implementing apply is not).
+- Skip ahead of the current PR in the plan unless asked to keep brainstorming (discussion is fine; implementing apply is not).
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Scope
 
-**Portage** (`lundgren-greg/portage-app`, binary: `portage`) is a local-first inventory and shuttle tool. It will
+**Portage** (binary: `portage`) is a local-first inventory and shuttle tool. It will
 eventually talk to Google Drive and Microsoft Graph **only** after the user runs
 `provider add` and later `apply`. There is no telemetry and no background daemon in MVP.
 
