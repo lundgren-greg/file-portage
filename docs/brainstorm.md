@@ -83,7 +83,7 @@ desire + priority → agent may ask 1–3 questions → Intent JSON
 - Local model: names/paths stay on the PC.
 - Online (Grok default): better clarifier; do not send full path lists unless opted in.
 
-This is written into the **working tree of `C:\Repos\file-portage`** (uncommitted design edits) but may not be on `portage-app` `main` yet. Treat this file as source of truth for the conversation. Merge/port those design edits in a PR when you implement or continue spec work.
+This file captures the current conversation context for `portage-app`. It was originally drafted in the older `C:\Repos\file-portage` clone, but is now checked into this repo and should be treated as the source of truth for the ongoing discussion.
 
 ---
 
