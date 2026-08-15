@@ -5,6 +5,8 @@
 
 **Portage** inventories local disks and cloud accounts, then shuttles files between them under a user-confirmed plan. The binary is `portage`. The GitHub repo is `file-portage` so it does not collide with Gentoo Portage.
 
+**Author / maintainer:** [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`). Nothing lands on `main` except through a pull request he reviews.
+
 Gaming clips (and anything else) that are split across a nearly full SSD, OneDrive, and Google Drive become one catalog. You can write a placement policy — or **say it** (“keep my clips on D: and whichever cloud has more free space”) and Grok compiles that into policy plus a dry-run plan. Portage never drives local free space below a reserved staging budget, never deletes the last verified copy, and never creates a public share. **The LLM never applies.** You type the plan id.
 
 ## Why this project
@@ -103,7 +105,8 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 
 - Read [PROJECT.md](PROJECT.md) first.
 - Implement in the order in [docs/design.md](docs/design.md) **PR Plan**.
-- Keep CI green. No force-push on `main` without asking.
+- Keep CI green.
+- **`main` is PR-only.** Branch, open a pull request, wait for CI. [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`) is the code owner and the only person who merges.
 
 ## Roadmap (high level)
 
