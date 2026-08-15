@@ -10,7 +10,7 @@
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
 | **Remote** | `origin` → https://github.com/lundgren-greg/file-portage.git |
-| **Status** | Design approved (user Qs resolved 2026-08-14). Implementation not started. Next: PR 1. |
+| **Status** | Public. `main` is PR-only; Greg (`@lundgren-greg`) reviews every merge. Design approved. Next: PR 1. |
 | **Updated** | 2026-08-14 |
 
 ---
@@ -26,7 +26,7 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 1. Created `lundgren-greg/file-portage` from `repo-template` (Rust CI, MIT).
 2. Wrote and reviewed the design (`docs/design.md`). Reviewer approved after 3 rounds.
 3. Checked in feature set (`docs/FEATURES.md`) and `configs/examples/gaming-clips.yaml`.
-4. **Next session / implementation agent: execute PR 1** in `docs/design.md` (workspace + CLI stub). Do not skip ahead to providers or apply.
+4. **Next session / implementation agent: execute PR 1** in `docs/design.md` (workspace + CLI stub). Branch + pull request; do not push `main`. Do not skip ahead to providers or apply.
 
 ---
 
@@ -117,6 +117,7 @@ No `portage` binary yet.
 | 2026-08-14 | Cloud-to-cloud is always a local shuttle. Placeholders are not replicas. |
 | 2026-08-14 | Apply requires typing the plan id. Last-copy + private ACL + staging reserve are non-negotiable. |
 | 2026-08-14 | Design approved after 3 review rounds. Source of truth: `docs/design.md`. |
+| 2026-08-14 | Repo is **public**. `main` is PR-only. CODEOWNERS `* @lundgren-greg`. Greg reviews and merges everything. |
 | 2026-08-14 | User resolved open questions: BYO OAuth; personal OneDrive in R1 / M365 in R2; Grok-first NL never applies; no-data-loss P0; undo = reverse-plan + second id; init+NL catalog recommendation with engine reject; full Google `drive`; TUI PR 15 after safety MVP. |
 
 ---
@@ -141,5 +142,6 @@ When starting a new agent/chat session:
 - Auto-apply plans. No daemon in R1. **LLM proposes, never applies.**
 - Start TUI (PR 15) or NL compile-to-plan (PR 16) before PR 13 undo is merged.
 - Skip the planner property tests (P-space, P-last-copy).
-- Force-push or rewrite history on `main` after the remote exists without asking.
+- Push or merge to `main`. Open a pull request; Greg (`@lundgren-greg`) merges.
+- Force-push or rewrite history on `main`.
 - Implement PRs out of order unless the design marks them independent (PR 6 can proceed after PR 4).
