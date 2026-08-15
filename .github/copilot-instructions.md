@@ -1,42 +1,42 @@
-# Copilot instructions — __PROJECT_NAME__
+# Copilot instructions — file-portage
 
 Windows-first local project. Read `PROJECT.md` first for current status, blockers,
 and the session resume checklist; keep it updated when you stop work.
+
+Approved design: `docs/design.md`. Feature checklist: `docs/FEATURES.md`.
+Implement the next PR in that plan. Do not invent a different stack or skip safety gates.
 
 Project skills are in `.agents/skills/`. Use them for commit, PR, review, debug,
 TDD, planning, security review, and PowerShell.
 
 ## Architecture
 
-```text
-src/          # Application / library code — all business logic lives here
-tests/        # Automated tests
-scripts/      # PowerShell helpers
-docs/         # Design notes
-samples/      # Synthetic samples only
-```
-
-- Keep UI / CLI shells thin over a core library.
-- New features go in core with tests, then get thin wiring in the shell.
+After PR 1, business logic lives in `crates/portage-*`. The CLI is a thin clap
+binary named `portage`. Until then, do not put app code in `src/`.
 
 ## Hard rules
 
-- **Offline / local-first.** No network calls, telemetry, or upload helpers unless a
-  feature is explicitly opt-in and documented in `SECURITY.md` first.
-- **Never commit secrets or real customer / production data.** Synthetic samples only
-  under `samples/`; local confidential files belong in `samples/private/` (gitignored).
-- No force-push / history rewrite on `main` without asking.
+- **No share-link APIs.** No `anyoneWithLink`, `createLink`, or anonymous ACLs.
+- **No placeholder hydration.** Overlay roots are not local replicas.
+- **No delete without `LastCopyGuard`.** Suspect ≠ verified.
+- **No apply without typing the plan id.**
+- **No telemetry.** Tokens never in YAML or git.
+- **Never commit secrets or real file inventories.**
 
 ## Build, test, run
 
 ```powershell
-# Replace with the stack commands after Initialize-Repo.ps1 -Stack ...
+# After PR 1:
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+cargo fmt --all -- --check
 ```
 
-CI (`.github/workflows/ci.yml`) must stay green — run the full test suite before committing.
+CI must stay green. Planner PRs require P-space and P-last-copy tests.
 
 ## Conventions
 
+- Rust edition 2021, clippy `-D warnings`.
 - PowerShell: approved verbs, `Verb-Noun`, `[CmdletBinding()]`, 4-space indent.
 - Follow `.editorconfig`.
 - Tests create temp dirs/files and clean up afterwards.

@@ -6,82 +6,59 @@ on:
   pull_request:
     branches: [main, master]
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
 permissions:
   contents: read
 
 jobs:
-  repo-kit:
-    name: Repo kit
-    runs-on: windows-latest
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - name: Required files exist
-        shell: pwsh
-        run: |
-          $required = @(
-            "README.md",
-            "LICENSE",
-            "SECURITY.md",
-            "CODEOWNERS",
-            "PROJECT.md",
-            "AGENTS.md",
-            ".editorconfig",
-            ".gitignore",
-            ".github/workflows/ci.yml",
-            ".github/copilot-instructions.md"
-          )
-          $missing = $required | Where-Object { -not (Test-Path $_) }
-          if ($missing) {
-            Write-Error "Missing required repo-kit files:`n$($missing -join "`n")"
-            exit 1
-          }
-          Write-Host "Repo kit files present."
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
-      - name: Parse PowerShell scripts
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem -Path scripts, .github -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue
-          if (-not $files) {
-            Write-Host "No PowerShell scripts to parse."
-            exit 0
-          }
-          $errors = @()
-          foreach ($file in $files) {
-            $tokens = $null
-            $parseErrors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile(
-              $file.FullName,
-              [ref]$tokens,
-              [ref]$parseErrors
-            ) | Out-Null
-            if ($parseErrors.Count -gt 0) {
-              $errors += "$($file.FullName): $($parseErrors.Count) parse error(s)"
-              $parseErrors | ForEach-Object { Write-Host "  $_" }
-            } else {
-              Write-Host "OK: $($file.FullName)"
-            }
-          }
-          if ($errors.Count -gt 0) {
-            Write-Error "PowerShell parse errors:`n$($errors -join "`n")"
-            exit 1
-          }
+      - name: Cache Cargo registry & build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
-      - name: PSScriptAnalyzer (Error severity)
-        shell: pwsh
+      - name: Check design docs
         run: |
-          $files = Get-ChildItem -Path scripts -Filter *.ps1 -ErrorAction SilentlyContinue
-          if (-not $files) {
-            Write-Host "No scripts/ files to analyze."
-            exit 0
-          }
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
-          $results = $files | ForEach-Object {
-            Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error
-          }
-          if ($results) {
-            $results | Format-Table -AutoSize
-            Write-Error "$($results.Count) PSScriptAnalyzer error(s)"
-            exit 1
-          }
-          Write-Host "PSScriptAnalyzer: no errors."
+          test -f docs/design.md
+          test -f docs/FEATURES.md
+          test -f configs/examples/gaming-clips.yaml
+        shell: bash
+
+      - name: Build
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo build --workspace
+
+      - name: Test
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo test --workspace
+
+      - name: Clippy
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Format check
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo fmt --all -- --check

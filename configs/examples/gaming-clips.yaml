@@ -1,0 +1,116 @@
+# Example Portage config + gaming-clips policy.
+# Copy pieces into %LOCALAPPDATA%\Portage\config.yaml after `portage init`.
+# No secrets. Client ids come from env. Tokens never live here.
+#
+# This file is the PR 9/10 fixture. path_contains is a case-insensitive
+# literal substring: /Archive/ does NOT match /Archives/.
+
+data_dir: "D:\\PortageData"
+catalog: "${data_dir}/catalog.sqlite"
+staging_dir: "D:\\.portage-staging"
+staging_reserve_bytes: 1073741824    # 1 GiB; < 64 MiB rejected unless flags.allow_tiny_reserve
+space_slack_bytes: 67108864          # 64 MiB; executor-only
+lock_timeout: 0
+
+flags:
+  allow_cloud_delete: false
+  allow_apply: true
+  allow_tiny_reserve: false
+  max_apply_bytes: null
+
+hash:
+  algorithm: blake3
+  quick_probe_bytes: 65536
+  batch_txn_rows: 1000
+
+media:
+  cheap_probe_bytes: 1048576
+  ffprobe_path: null
+
+auth:
+  google_client_id_env: PORTAGE_GOOGLE_CLIENT_ID
+  google_client_secret_env: PORTAGE_GOOGLE_CLIENT_SECRET
+  ms_client_id_env: PORTAGE_MS_CLIENT_ID
+
+providers:
+  - id: local-d
+    type: local
+    root: "D:\\"
+    exclude:
+      - "D:\\.portage-staging"
+      - "D:\\$RECYCLE.BIN"
+      - "System Volume Information"
+  - id: local-c
+    type: local
+    root: "C:\\"
+    exclude:
+      - "C:\\Windows"
+      - "C:\\Program Files"
+      - "C:\\Program Files (x86)"
+      - "C:\\ProgramData"
+  - id: gdrive
+    type: google_drive
+    account: "user@gmail.com"
+  - id: onedrive
+    type: onedrive
+    account: "user@outlook.com"
+
+collections:
+  # Archives MUST be first so OldClips / Archives videos are evictable.
+  - name: Archives
+    match:
+      any:
+        - path_contains:
+            - "\\Archive\\"
+            - "\\Archives\\"
+            - "\\OldClips\\"
+            - "/Archive/"
+            - "/Archives/"
+            - "/OldClips/"
+        - extension: [zip, 7z, rar]
+    policy:
+      keep_local: cloud_only
+      min_replicas: 1
+      cloud: { specific: gdrive }
+      dest_subdir: "Archives"
+
+  - name: Gaming Clips
+    match:
+      all:
+        - any:
+            - mime_prefix: "video/"
+            - extension: [mp4, mkv, mov, webm, avi]
+        - not:
+            path_contains:
+              - "\\Archive\\"
+              - "\\Archives\\"
+              - "\\OldClips\\"
+              - "/Archive/"
+              - "/Archives/"
+              - "/OldClips/"
+    policy:
+      keep_local: prefer
+      pin_local: false
+      min_replicas: 2
+      prefer_local: [local-d]
+      cloud: { most_free: [gdrive, onedrive] }
+      dest_subdir: "Gaming/Clips"
+
+  - name: Documents
+    match:
+      any:
+        - extension: [pdf, docx, xlsx, txt, md]
+        - mime_prefix: "application/pdf"
+    policy:
+      keep_local: prefer
+      min_replicas: 2
+      prefer_local: [local-d]
+      cloud: { most_free: [gdrive, onedrive] }
+      dest_subdir: "Documents"
+
+  - name: default
+    match: { any: [{ always: true }] }
+    policy:
+      keep_local: prefer
+      min_replicas: 1
+      cloud: { most_free: [gdrive, onedrive] }

@@ -65,6 +65,11 @@ Thumbs.db
 .ai-memory.json
 /samples/private/
 /samples/**/*confidential*
+secrets.env
+tokens.dpapi
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 ## Published output
 publish/
