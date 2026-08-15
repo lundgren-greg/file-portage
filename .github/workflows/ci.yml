@@ -62,3 +62,31 @@ jobs:
       - name: Format check
         if: hashFiles('Cargo.toml') != ''
         run: cargo fmt --all -- --check
+
+  coverage:
+    name: Coverage gate (core/catalog/engine ≥ 80%)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache Cargo registry & build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-llvm-cov-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-llvm-cov-
+
+      - name: Coverage
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo llvm-cov -p portage-core -p portage-catalog -p portage-engine --fail-under-lines 80 --summary-only

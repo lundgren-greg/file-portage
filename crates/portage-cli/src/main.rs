@@ -1,7 +1,8 @@
 //! `portage` — inventory local disks and clouds, plan space-safe moves.
 //!
-//! PR 1 scope: `portage --help` and `portage init`. Everything else arrives
-//! in later PRs per `docs/design.md`.
+//! PR 1 scope: `portage --help` and `portage init`. PR 1.5 adds structured
+//! logging, metrics, and `portage status`. Everything else arrives in later
+//! PRs per `docs/design.md`.
 
 mod cmd;
 
@@ -13,6 +14,10 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "portage", version, about, long_about = None)]
 struct Cli {
+    /// Verbose stderr logging (debug level). RUST_LOG overrides.
+    #[arg(long, short = 'v', global = true)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -25,12 +30,17 @@ enum Command {
     /// a recommendation for the largest volume instead — it never relocates
     /// silently. Pass --data-dir to choose the location explicitly.
     Init(cmd::init::InitArgs),
+
+    /// Show run metrics and data-dir health. --format=prom emits Prometheus
+    /// text for a local textfile collector (no listener, no push).
+    Status(cmd::status::StatusArgs),
 }
 
 fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
-        Command::Init(args) => cmd::init::run(&args),
+        Command::Init(args) => cmd::init::run(&args, cli.verbose),
+        Command::Status(args) => cmd::status::run(&args, cli.verbose),
     };
     match result {
         Ok(()) => std::process::ExitCode::SUCCESS,

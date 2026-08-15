@@ -7,4 +7,12 @@ repository.workspace = true
 description = "Core types for Portage: errors, byte units, identifiers"
 
 [dependencies]
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+time = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

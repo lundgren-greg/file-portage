@@ -7,7 +7,7 @@
 
 
 
-**Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. The GitHub repo is [`portage-app`](https://github.com/lundgren-greg/portage-app) so it does not collide with Gentoo Portage.
+**Portage** inventories files across the places they already live — internal disks, **external drives**, OneDrive, Google Drive, and later other providers — then moves them under a plan you confirm. The binary is `portage`. (The name comes from the canoe trail, not Gentoo's package manager.)
 
 When the same library is split across a full internal disk and two clouds — gaming clips, documents, archives, whatever you actually have — Portage builds one catalog, applies your placement rules, and sequences copy / shuttle / evict so local free space never goes below a reserved staging budget. It never deletes the last verified copy and never creates a public share. You can write the rules in YAML or **say them**; Grok compiles that into a dry-run plan. **The LLM never applies.** You type the plan id.
 
@@ -140,6 +140,15 @@ Empty, `y`, or `yes` is **rejected** at apply. Confirmation is the exact plan id
 ## Security and privacy
 
 See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`. There is no background daemon and no public-link feature.
+
+## Grafana (optional, local)
+
+Portage never opens a port and never pushes telemetry — but it writes two things a **local** Grafana stack can scrape:
+
+- **Logs:** structured JSON lines at `%data_dir%\logs\portage.YYYY-MM-DD.jsonl` (daily rotation, 7 files). Point a local [Grafana Alloy](https://grafana.com/docs/alloy/latest/) / Promtail file scrape at that directory and ship to your own Loki. Fields are stable (`ts`, `level`, `target`, `msg`, plus `plan_id` / `op_id` / `provider` / `size` / `residual` / `state` where relevant). Tokens, `Authorization` headers, and preauthenticated URLs are masked *inside* the logging layer — they never reach the file.
+- **Metrics:** every run atomically rewrites `%data_dir%\metrics\portage.prom` (Prometheus text format), and `portage status --format=prom` prints the same. Feed it to a Prometheus / Alloy *textfile collector* (or `windows_exporter`'s textfile directory).
+
+If you never set any of that up, the files just sit there locally. Nothing leaves your machine.
 
 ## Contribution and development notes
 
