@@ -85,7 +85,7 @@ Also in Release 1:
 
 - Real-time sync daemon / always-on watcher (USN journal / FUSE / Cloud Filter provider).
 - Editing or transcoding media.
-- Deduplicating *storage* (chunk-level CAS / CDC). We identify whole-file duplicates; we do not block-level-dedup on disk. “Remove duplicates” in NL means plan extra-*local* evicts of confirmed dups when another verified replica exists — never a last-copy delete, never a cloud delete in R1.
+- Deduplicating *storage* (chunk-level CAS / CDC). We identify whole-file duplicates; we do not block-level-dedup on disk. “Consolidate/remove duplicates” means: when the same `ContentId` exists on several providers (local, USB, Google Drive, OneDrive), the plan places **one verified copy at the desired destination** and evicts the redundant **local/USB** copies to reclaim capacity — never a last-copy delete. Deleting the redundant *cloud* copy (e.g. the Drive duplicate) is **Release 2** (`--allow-cloud-delete`, still last-copy gated); in R1 cloud duplicates are reported by `dups` but left in place.
 - Automatic destructive apply. No “just keep the disk optimized” background job. The LLM cannot bypass this.
 - Becoming a backup product with versioning, retention, or ransomware timelines (we keep last-copy safe; we do not implement a backup catalog of historical versions).
 - Microsoft 365 / SharePoint site drives (Release 2).
@@ -1756,7 +1756,7 @@ Do not implement these in Release 1. They do not take priority over R1 no-data-l
 | --- | --- |
 | **Release 2: Microsoft 365 / SharePoint** | Site drives, `organizations` tenant. Same last-copy / private-only rules. |
 | Dropbox, S3-compatible (B2 / Wasabi / AWS), SMB / NAS | Same `Provider` trait. S3: never `public-read`. |
-| `--allow-cloud-delete` implementation | Flag exists and is rejected in R1. Still last-copy gated if ever implemented. |
+| `--allow-cloud-delete` implementation | Flag exists and is rejected in R1. Driving use case: cross-provider dedupe — delete the redundant cloud copy after a verified copy lands at the destination. Still last-copy gated if ever implemented. |
 | USN Journal incremental local index | After the walker is correct. |
 | Optional `ffprobe` | When `PORTAGE_FFPROBE` is set. |
 | FTS5 search | After `search` LIKE is good enough. |
