@@ -125,7 +125,7 @@ No `portage` binary yet.
 | 2026-08-14 | Apply requires typing the plan id. Last-copy + private ACL + staging reserve are non-negotiable. |
 | 2026-08-14 | Design approved after 3 review rounds. Source of truth: `docs/design.md`. |
 | 2026-08-14 | Repo is **public**. `main` is PR-only. CODEOWNERS `* @lundgren-greg`. Greg reviews and merges everything. |
-| 2026-08-15 | External / USB volumes are first-class (`shuttle` hop and/or `final` dest; identity = volume serial). README use cases stay general — no product verticals. |
+| 2026-08-15 | External / USB volumes are first-class (`shuttle` hop and/or `final` dest; identity = volume serial). README leads with capabilities and names concrete situations (gaming clips **and** docs, archives, full disk, dups) so the audience is not one niche. |
 | 2026-08-14 | User resolved open questions: BYO OAuth; personal OneDrive in R1 / M365 in R2; Grok-first NL never applies; no-data-loss P0; undo = reverse-plan + second id; init+NL catalog recommendation with engine reject; full Google `drive`; TUI PR 15 after safety MVP. |
 
 ---

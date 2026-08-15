@@ -9,7 +9,7 @@
 
 **Author / maintainer:** [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`). Nothing lands on `main` except through a pull request he reviews.
 
-When the same library is split across a full internal disk and two clouds, Portage builds one catalog, applies your placement rules, and sequences copy / shuttle / evict so local free space never goes below a reserved staging budget. It never deletes the last verified copy and never creates a public share. You can write the rules in YAML or **say them**; Grok compiles that into a dry-run plan. **The LLM never applies.** You type the plan id.
+When the same library is split across a full internal disk and two clouds — gaming clips, documents, archives, whatever you actually have — Portage builds one catalog, applies your placement rules, and sequences copy / shuttle / evict so local free space never goes below a reserved staging budget. It never deletes the last verified copy and never creates a public share. You can write the rules in YAML or **say them**; Grok compiles that into a dry-run plan. **The LLM never applies.** You type the plan id.
 
 ## Why this project
 
@@ -19,7 +19,18 @@ Portage is a **control plane** (catalog, policy, planner, journal) plus a **priv
 
 ## Use cases
 
-These are capabilities, not product verticals. If the files exist as bytes on a disk or in a connected account, they are in scope.
+The product is the same for any large library that has wandered. Gaming clips are a real one. They are not the only one.
+
+| Situation | What you tell Portage |
+| --- | --- |
+| Game captures half on OneDrive, half on Google Drive, SSD almost full | Keep recent clips on the fast disk **and** on whichever cloud has more space. Older ones can leave the SSD once a verified cloud copy exists. |
+| Work docs and PDFs in both clouds, copies you cannot tell apart | One inventory, confirmed duplicates by content, keep two verified copies where you asked — not three mystery ones. |
+| A folder that should live on the USB drive *and* in the cloud | External disk is the **home**; the cloud is the replica. Or the reverse. |
+| Internal disk has 4 GiB free and you need to move something large between clouds | Plug in the USB drive as a **hop**. Download → verify → upload → delete staging. The machine stays above its reserve. |
+| Old zip/backup folders still sitting on C: or D: | Mark them archive / cloud-only. Evict local only after the remote copy verifies. |
+| Same file under three names in three places | `dups` shows confirmed content matches. The plan does not delete the last verified copy. |
+
+If it is a file on a disk or in a connected account, it is in scope. Portage does not become a game tool, a photo app, or a document suite — it places **bytes**.
 
 **See everything in one place.** Index internal volumes, plugged-in external drives, Google Drive, and OneDrive (via their APIs — not desktop placeholders). Search, list by collection, and group confirmed duplicates by content hash.
 
@@ -38,7 +49,7 @@ The drive is identified by **volume serial**, not letter. If it is unplugged, an
 
 **Confirm before anything mutates.** `portage plan` is a dry run. `portage apply` rejects `y` / `yes` / Enter. Undo is a reverse plan you confirm with a second id, and it refuses if that reverse would lose the last copy or breach the reserve.
 
-**Ask in plain language (after the safety MVP).** `portage ask "keep these on the external drive and whichever cloud has more space"` compiles to policy + a plan. It does not apply.
+**Ask in plain language (after the safety MVP).** `portage ask "keep my gaming clips on D: and whichever cloud has more space"` or `"put the archive folder on the USB drive and Google Drive"` compiles to policy + a plan. It does not apply.
 
 ## Status
 
