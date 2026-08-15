@@ -5,7 +5,7 @@ Human-facing map of what we are building and how we work. The implementable spec
 GitHub’s Wiki tab is [lundgren-greg/portage-app/wiki](https://github.com/lundgren-greg/portage-app/wiki). The `.wiki.git` remote does not exist until someone saves the first page in the UI. After that, publish these files with:
 
 ```powershell
-cd C:\Repos\file-portage
+cd C:\Repos\portage-app
 .\scripts\Publish-Wiki.ps1
 ```
 

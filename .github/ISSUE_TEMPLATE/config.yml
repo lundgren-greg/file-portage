@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security report
-    url: https://github.com/lundgren-greg/file-portage/security/advisories/new
+    url: https://github.com/lundgren-greg/portage-app/security/advisories/new
     about: Do not open a public issue for vulnerabilities. Use private reporting.

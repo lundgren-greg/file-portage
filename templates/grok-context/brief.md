@@ -1,4 +1,4 @@
-# Thread brief — file-portage
+# Thread brief — portage-app
 
 **Stopped at:** Created from repo-template; fill Goal in PROJECT.md.
 

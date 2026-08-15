@@ -121,7 +121,7 @@ Also in Release 1:
 | K15 | **CLI-scriptable engine.** `portage-engine` is a crate. `portage` CLI and `portage-tui` are two binaries on the same crates. No business logic lives only in a UI. | Prevents CLI-shaped or TUI-shaped invariants. |
 | K16 | **No silent overwrite.** Same dest path + different `ContentId` = conflict op, not a write. Same dest path + same `ContentId` = idempotent no-op. | Path is not identity. |
 | K17 | **Release 1 providers implemented as HTTP + local FS, not rclone embedding.** | rclone is AGPL and its surface includes public-link and server-side copy behaviors we do not want to inherit. |
-| K18 | **Grok-first NL front door, vendor-agnostic trait.** `portage-nl` talks to an `LlmProvider`. First impl is xAI Grok (`XAI_API_KEY`, `https://api.x.ai/v1`, default model `grok-4.5`; re-check docs.x.ai at implement time). Other vendors are additional impls of the same trait. | User wants to speak the product. Hard-coding one HTTP client to Grok would block later providers. |
+| K18 | **Clarify-then-plan agent, local or online.** `portage-nl` talks to an `LlmProvider`. The user states **desire** (what goes where) and **priority** (what to free or keep first). The agent asks until `Intent` is unambiguous, then the deterministic planner emits a dry-run. Online default: xAI Grok (`XAI_API_KEY`, `https://api.x.ai/v1`, `grok-4.5` — re-check docs.x.ai). Local: any OpenAI-compatible endpoint (Ollama, LM Studio, etc.). Same trait. | The fun product is conversation + a seatbelt, not a hidden janitor. Paths stay on-box if the user picks local. |
 | K19 | **LLM never applies.** It emits structured `Intent` → policy YAML fragment + a dry-run `PlanId`. Apply, evict, upload, delete stay behind the typed plan-id gate (and last-copy / private-only / reserve). The model has no `Executor` handle. | An LLM that can delete is how you lose the library. |
 | K20 | **No data loss is Release 1 P0.** Safety MVP (PRs 1–13 apply+undo) ships before TUI and before NL compile-to-plan. | User: files must be maintained. Fun UX is R1 but after apply is safe. |
 | K21 | **TUI after safety MVP.** `portage-tui` (ratatui) is PR 15. Color, hotkeys, configurability. It reviews plans and can *launch* apply; the user still types the plan id. PRs 1–13 are not blocked on it. | Fun surface without putting chrome in front of last-copy. |
@@ -1026,46 +1026,69 @@ Empty, `y`, or `yes` is **rejected**.
 
 Exit codes: `0` ok, `2` usage, `3` locked, `4` unsatisfiable plan, `5` space drift, `6` last-copy, `7` ACL/public, `8` verify fail, `10` needs attention.
 
-### Natural-language / Grok layer
+### Natural-language agent (clarify → plan)
 
-The LLM is the product front door, not an executor. Crate: `portage-nl`. CLI: `portage ask "…"`. TUI may open the same compile path. **There is no `apply` method on this crate.**
+The fun product: you say **what should go where** and **what to prioritize**. An agent — **on this machine or online** — asks until that is unambiguous, then the existing planner prints a dry-run. You still type the plan id.
 
-#### Provider trait (not a hard-coded vendor)
+The LLM is the front door, not an executor. Crate: `portage-nl`. CLI: `portage ask`. TUI uses the same loop. **There is no `apply` method on this crate.**
+
+#### Loop
+
+```text
+desire + priority  →  agent may ask 1–3 questions  →  Intent JSON
+        →  compile.rs (deterministic)  →  planner dry-run  →  you type the plan id
+```
+
+- **Desire** = placement: keep recent clips on D:, archives on the USB, replica on the cloud with more space.
+- **Priority** = order when space is tight: free C: first, never touch pinned, evict unpinned archives before anything else.
+- If `Intent` is missing a dest, a volume, or a priority when the disk is tight, the agent **asks**. It does not guess a delete.
+- Online providers receive a **redacted catalog digest** (counts, sizes, volume labels, collection names — not full path lists) unless the user opts into `nl.send_paths: true`. Local providers may read the full digest on-box.
+
+#### Provider trait (local or online)
 
 ```rust
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
     fn id(&self) -> &str;
+    fn residency(&self) -> Residency; // Local | Online
     async fn complete_json(&self, system: &str, user: &str, schema: &JsonSchema) -> Result<serde_json::Value>;
 }
 ```
 
-**Grok first (Release 1):**
+| Provider | When | Config |
+| --- | --- | --- |
+| **Online / Grok** (default in R1) | You want the better clarifier | `nl.provider: grok`, `XAI_API_KEY`, `https://api.x.ai/v1`, model `grok-4.5` (re-check docs.x.ai) |
+| **Local** | Paths and names never leave the PC | `nl.provider: local`, `nl.local.base_url` (Ollama / LM Studio / any OpenAI-compatible `localhost`), `nl.local.model` |
+| Later | Other online vendors | More `LlmProvider` impls (`openai`, `anthropic`, …) |
 
-| Setting | Value |
-| --- | --- |
-| Env | `XAI_API_KEY` (never YAML, never committed) |
-| Base URL | `https://api.x.ai/v1` |
-| Default model | `grok-4.5` — **re-check [docs.x.ai](https://docs.x.ai) at implement time** |
-| API shape | OpenAI-compatible chat completions; request JSON matching `Intent` |
-
-Additional vendors are more `LlmProvider` impls (`openai`, `anthropic`, …) selected in config `nl.provider`. R1 ships Grok only.
+R1 ships **Grok** and a **local OpenAI-compatible client**. Same `Intent` schema. Switching providers does not change last-copy or confirm.
 
 #### Intent schema (compiler input)
 
-The model must return JSON that deserializes to `Intent`. On schema failure, `portage ask` reprints the error and does not touch policy.
+The model must return JSON that deserializes to `Intent`. On schema failure, `portage ask` reprints the error and does not touch policy. If the model returns `needs_clarification`, the CLI/TUI asks those questions and calls the model again (cap 3 rounds).
 
 ```rust
 pub struct Intent {
-    pub summary: String,                    // one-line restatement for the user
-    pub collections: Vec<CollectionDraft>,  // may be empty → use existing YAML
+    pub summary: String,                    // restatement the user can reject
+    pub goal: Goal,                         // Place | MakeSpace | Consolidate | Mix
+    pub collections: Vec<CollectionDraft>,  // may be empty → existing YAML
     pub keep_local: Option<KeepLocal>,      // None → engine default prefer
     pub dests: Vec<DestHint>,               // local path and/or provider+subdir
-    pub year: Option<i32>,                  // e.g. "photos for this year"
+    pub priorities: Vec<Priority>,          // order when space is tight
+    pub year: Option<i32>,
     pub dedup: DedupIntent,                 // None | ExtraLocalOnly
-    pub data_dir: Option<PathBuf>,          // optional catalog location confirm
+    pub data_dir: Option<PathBuf>,
+    pub needs_clarification: Vec<String>,   // empty ⇒ ready to compile
 }
 
+pub enum Goal { Place, MakeSpace, Consolidate, Mix }
+pub enum Priority {
+    FreeVolume { location: String },      // "free C:"
+    KeepPinned,
+    EvictUnpinnedArchivesFirst,
+    PreferNewestLocal { collection: String },
+    UseShuttle { location: String },      // "use the USB as the hop"
+}
 pub enum DedupIntent { None, ExtraLocalOnly }
 pub struct DestHint {
     pub kind: DestKind, // LocalPath | ProviderSubdir
@@ -1075,13 +1098,15 @@ pub struct DestHint {
 
 Compile rules (`compile.rs`), deterministic, no LLM:
 
-1. Validate `Intent` against the catalog (unknown provider → error; overlay `data_dir` → engine reject).
-2. If `data_dir` is set, same reject rules as `init` (free < 8 GiB or overlay → refuse).
-3. Merge `CollectionDraft` into a policy fragment. Do not silently replace the user’s YAML; write a dated fragment under `%data_dir%/intents/` and show the diff.
-4. `keep_local`: if the utterance (compiled field) is `Required` — user said “must stay on C:” / “onto my C drive” — use `required`. Otherwise engine default **`prefer`** + `replica_shortfall` warning.
-5. `DedupIntent::ExtraLocalOnly`: for each confirmed (`ContentId`) group, `CanEvict` extra **local** replicas only when another **verified** replica remains. Never emit cloud deletes. Never evict a last copy.
-6. Call the existing planner. Show the dry-run plan. Stop.
-7. The user runs `portage apply <plan-id>` (or the TUI does the same typed confirm).
+1. If `needs_clarification` is non-empty, do not compile — ask.
+2. Validate `Intent` against the catalog (unknown provider → error; overlay `data_dir` → engine reject).
+3. If `data_dir` is set, same reject rules as `init` (free < 8 GiB or overlay → refuse).
+4. Merge `CollectionDraft` into a policy fragment. Do not silently replace the user’s YAML; write a dated fragment under `%data_dir%/intents/` and show the diff.
+5. Apply `priorities` as planner hints: evict order, which volume to free, whether a shuttle volume is in play. They cannot override last-copy, pin, or `required`.
+6. `keep_local`: `Required` only if the user named a must-keep dest. Otherwise **`prefer`** + `replica_shortfall`.
+7. `DedupIntent::ExtraLocalOnly`: evict extra **local** replicas of a confirmed blob only when another **verified** replica remains. Never emit cloud deletes.
+8. Call the existing planner. Show the dry-run. Stop.
+9. The user runs `portage apply <plan-id>` (or the TUI typed-confirm modal).
 
 #### Example utterances
 
@@ -1603,9 +1628,14 @@ Non-negotiable invariants, with the code site that enforces them:
 
 ## Observability
 
-Local app — no SaaS metrics backend.
+Local app — no SaaS metrics backend, no telemetry. Everything below stays on the user's disk; a user who wants dashboards points their own local Grafana stack at these files.
 
-**Logging:** `tracing` → rolling file `%data_dir%/logs/portage.YYYY-MM-DD.log` (10 MiB × 7) + stderr with `RUST_LOG` / `--verbose`. Fields: `plan_id`, `op_id`, `provider`, `size`, `residual`, `state`. **Never** log tokens, `Authorization` headers, or `session_uri` query strings (Graph download URLs are preauth — treat as secret; log only item id).
+**Logging (Grafana-friendly, local only):** `tracing` with two sinks:
+
+- **Structured JSON-lines** → rolling file `%data_dir%/logs/portage.YYYY-MM-DD.jsonl` (10 MiB × 7, `tracing-subscriber` JSON formatter). One event per line with stable fields: `ts` (RFC 3339), `level`, `target`, `msg`, plus context fields `plan_id`, `op_id`, `provider`, `size`, `residual`, `state`. This format is directly scrapeable by a user-run **Grafana Alloy / Promtail → Loki** pipeline (documented in README; we never ship or push to one).
+- **Human-readable stderr** with `RUST_LOG` / `--verbose`.
+
+**Redaction is enforced in the logging layer, not by convention:** a redaction layer drops/masks `token`, `access_token`, `refresh_token`, `Authorization`, and `session_uri` query strings (Graph download URLs are preauth — treat as secret; log only item id). Unit tests feed hostile events through the subscriber and assert the JSONL output never contains those values. Paths of user files are logged at `debug` and below only.
 
 **Metrics (in-process, shown by `status` and written to `apply_log`):**
 
@@ -1613,6 +1643,8 @@ Local app — no SaaS metrics backend.
 - `plan.ops`, `plan.min_residual`, `plan.unsatisfiable`
 - `apply.bytes_copied`, `apply.ops_committed`, `apply.verify_failures`
 - `space.free`, `space.usable`, `space.drift_events`
+
+**Metrics export (pull, never push):** the same counters/gauges serialize to **Prometheus text exposition format** via `portage status --format=prom`, and each run atomically rewrites `%data_dir%/metrics/portage.prom` on exit. A local Prometheus/Alloy *textfile collector* (or `windows_exporter` textfile directory) can scrape that file into Grafana. No listener, no port, no network I/O — writing a local file is the entire integration.
 
 **Alerting:** none pushed. `doctor` exits non-zero on: lock stale, journal `NeedsAttention`, last `assert_private` failure, catalog integrity, free < reserve, OneDrive or DriveFS installed with **zero** `overlay_roots` registered, a configured local root that is itself an overlay.
 
@@ -1654,6 +1686,7 @@ This is a new GitHub repo, not a production service. “Rollout” = implementab
 - `undo.rs`: reverse-plan of the 4 GiB fixture requires a second id; refuse if staging reserve would break or a blob would hit 0 verified; never calls executor on `undo` without confirm.
 - `portage-nl` compile: photo-consolidation utterance fixture → `keep_local: required` on C: Photos, gdrive `/Photos/<year>`, `ExtraLocalOnly` dedup, **zero** cloud deletes, **does not** invoke apply. “must stay on C:” → `required`. Unspecified keep → `prefer`.
 - `hash.rs` `MultiHasher`: BLAKE3+MD5 of a fixture equals standalone hashes.
+- `obs`: JSONL log lines parse and carry the stable field set; redaction layer masks `token` / `Authorization` / `session_uri` (hostile-event fixtures); rollover honors 10 MiB × 7; Prometheus text output parses with `prometheus-parse` and counter names are stable.
 
 ### Planner property / simulation (`portage-sim` + `proptest`)
 
@@ -1691,9 +1724,13 @@ This is a new GitHub repo, not a production service. “Rollout” = implementab
 - 50× 100 MiB files, 4 GiB simulated free, mixed providers in mock.
 - One real 2 GiB clip on a throwaway Google account (not CI).
 
-### Coverage bar for merge of planner PRs
+### Coverage and per-PR gates
 
-P-space and P-last-copy must be present and green. A planner PR without those two tests is incomplete.
+- **Coverage:** CI runs `cargo llvm-cov --workspace` and **fails below 80% line coverage** on `portage-core`, `portage-catalog`, and `portage-engine` (report-only for `portage-cli`, providers behind wiremock, `portage-tui`). The gate lands with PR 1.5 and is enforced from PR 2 onward.
+- **Every PR** ships unit tests for its new logic **and at least one integration test** (`crates/<crate>/tests/`) for each boundary it touches (filesystem → temp dirs, HTTP → wiremock, DB → temp catalog). Tests clean up after themselves.
+- **Planner PRs:** P-space and P-last-copy must be present and green. A planner PR without those two tests is incomplete.
+- **Executor PRs:** crash-injection at every journal state + `resume` is mandatory.
+- **Logging/metrics PRs:** redaction tests are merge-blocking — a diff that can log a token does not merge.
 
 ---
 
@@ -1762,11 +1799,18 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 - **Depends on:** none
 - **Description:** Compiles on Windows and Ubuntu. `portage init` measures `C:` free; if `< 8 GiB` prints a recommendation for the largest non-overlay volume (`D:\PortageData`) and does **not** silently relocate. Creates `%data_dir%/portage.lock`. CI runs `fmt`, `clippy -D warnings`, `test`. No network, no SQLite yet.
 
+### PR 1.5 — Observability foundation: JSON logs, metrics, coverage gate
+
+- **Title:** `feat(obs): tracing JSONL logs, prom metrics snapshot, coverage gate`
+- **Files/components:** `crates/portage-core/src/obs/{mod,logging,metrics,redact}.rs`, CLI wiring (`--verbose`, `RUST_LOG`), `.github/workflows/ci.yml` `cargo llvm-cov` job (≥80% on core/catalog/engine), README "Grafana (optional, local)" section
+- **Depends on:** PR 1
+- **Description:** `init_tracing(data_dir)` installs two sinks: rolling JSON-lines file `%data_dir%/logs/portage.YYYY-MM-DD.jsonl` (10 MiB × 7) and human stderr. Redaction layer masks `token` / `Authorization` / `session_uri` before serialization; hostile-event unit tests prove it. In-process metrics registry (atomic counters/gauges); `portage status --format=prom` and an atomic rewrite of `%data_dir%/metrics/portage.prom` on exit — Prometheus text format for a local Alloy/textfile collector. **No listener, no network, no telemetry.** Every later PR uses these APIs instead of ad-hoc `eprintln!`.
+
 ### PR 2 — Core identity, hashing, and safe paths
 
 - **Title:** `feat(core): BLAKE3 content ids, quickhash, path containment`
 - **Files/components:** `crates/portage-core/src/{ids,hash,paths,units}.rs`, unit tests including BLAKE3 fixtures, `MultiHasher` (BLAKE3+MD5+SHA1), and `..` / ADS rejection
-- **Depends on:** PR 1
+- **Depends on:** PR 1.5 (coverage gate + logging APIs)
 - **Description:** Streaming hasher with 1 MiB buffer. `ContentId` display/parse `b3:`. `TransferDigests`. `ensure_inside(root, path)`. No filesystem walk yet.
 
 ### PR 3 — SQLite catalog schema and access layer
@@ -1862,9 +1906,9 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 
 ### PR 16 — Natural-language / Grok layer
 
-- **Title:** `feat(nl): portage ask compiles utterances to policy + dry-run plan`
-- **Files/components:** `crates/portage-nl/**` (`LlmProvider`, `intent.rs`, `compile.rs`, `providers/grok.rs`), CLI `ask.rs`, config `nl:`, tests with recorded JSON (no live `XAI_API_KEY` in CI)
+- **Title:** `feat(nl): clarify-then-plan agent (local or online)`
+- **Files/components:** `crates/portage-nl/**` (`LlmProvider`, `intent.rs`, `clarify.rs`, `compile.rs`, `providers/grok.rs`, `providers/local.rs`), CLI `ask.rs`, config `nl:`, tests with recorded JSON (no live keys in CI)
 - **Depends on:** PR 10 (planner) at minimum; prefer PR 12 so a compiled plan is apply-able. A **read-only** stub (search/dups/list only) may land after PR 5.
-- **Description:** Grok-first (`XAI_API_KEY`, `https://api.x.ai/v1`, model `grok-4.5` pending docs.x.ai check). `Intent` JSON schema. Compile rules: prefer vs required, `ExtraLocalOnly` dedup, `data_dir` reject. Fixture: the photo-consolidation utterance produces a plan that does not apply and does not emit cloud deletes. **`portage-nl` has no `Executor` dependency.** Apply remains `portage apply <id>`.
+- **Description:** Desire + priority → up to 3 clarify rounds → `Intent` → planner. **Grok online** and **local OpenAI-compatible** (Ollama/LM Studio). Online gets a redacted catalog digest unless `nl.send_paths`. Priorities cannot override last-copy. Fixture: “free C: first, keep clips on D: and the roomier cloud, hop via USB” produces a plan and does not apply. **`portage-nl` has no `Executor` dependency.** Apply remains `portage apply <id>`.
 
 **Out of Release 1:** everything in [Future releases](#future-releases) — M365/SharePoint, Dropbox/S3/SMB, `--allow-cloud-delete` implementation, USN, ffprobe, FTS5, extra LLM vendors, Android/other OS, VM isolation, `preserve_relpath`, complete planner search, daemon, published OAuth client id.

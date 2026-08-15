@@ -1,12 +1,12 @@
 # For agents
 
-You are continuing Portage. Greg may be asleep. Do not invent a new architecture.
+You are continuing Portage. Greg may be away. Do not invent a new architecture.
 
 ## Start
 
 1. Read [PROJECT.md](https://github.com/lundgren-greg/portage-app/blob/main/PROJECT.md).
 2. Read the **PR Plan** at the bottom of [docs/design.md](https://github.com/lundgren-greg/portage-app/blob/main/docs/design.md).
-3. `git -C C:\Repos\file-portage status` and `git log -1 --oneline`.
+3. `git -C C:\Repos\portage-app status` and `git log -1 --oneline`.
 4. `gh auth status`. Remote is `https://github.com/lundgren-greg/portage-app.git`.
 
 ## Do now

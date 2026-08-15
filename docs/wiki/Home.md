@@ -18,9 +18,9 @@ The metaphor is the trail between two lakes: you carry the cargo overland becaus
 ## In one breath
 
 1. Index local volumes (including USB) and connected clouds. Do not open OneDrive / Drive desktop placeholders.
-2. Apply placement rules (YAML or a sentence to Grok).
-3. Print a dry-run plan with residual free space after every step.
-4. You type the **plan id** to apply. `y` / `yes` is rejected. The LLM never applies.
+2. Say what should go where and what to prioritize. An agent (on this PC or online) clarifies, then the planner prints a dry-run.
+3. Residual free space after every step. YAML still works if you do not want to talk.
+4. You type the **plan id** to apply. `y` / `yes` is rejected. The agent never applies.
 5. Never delete the last verified copy. Never make a file public. Never fill the disk below the staging reserve.
 
 ## Where to go next

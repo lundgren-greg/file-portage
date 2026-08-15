@@ -31,4 +31,4 @@ Do not treat the wiki as a second design doc. If the spec changes, change `docs/
 4. Planner PRs are incomplete without P-space and P-last-copy tests.
 5. No share-link APIs. No placeholder hydration. No apply without a typed plan id.
 
-Local clone today is still `C:\Repos\file-portage`. The GitHub name is `portage-app`.
+Local clone is `C:\Repos\portage-app` (matches the GitHub name `portage-app`).

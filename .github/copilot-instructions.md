@@ -1,4 +1,4 @@
-# Copilot instructions — file-portage
+# Copilot instructions — portage-app
 
 Windows-first local project. Read `PROJECT.md` first for current status, blockers,
 and the session resume checklist; keep it updated when you stop work.
