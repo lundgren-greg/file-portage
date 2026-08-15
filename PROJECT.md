@@ -28,16 +28,17 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 3. Checked in feature set (`docs/FEATURES.md`) and `configs/examples/gaming-clips.yaml`.
 4. Wiki draft lives in `docs/wiki/`. GitHub Wiki tab needs one “Create the first page” click, then `.\scripts\Publish-Wiki.ps1`.
 5. Ported the brainstorm decisions (`docs/brainstorm.md`): clarify-then-plan agent, **local or online** LLM (Grok default; Ollama/LM Studio), desire + priority `Intent`, redacted catalog digest for online providers.
-6. Plan updated: new **PR 1.5** (JSON-lines logs for Grafana Alloy/Loki, Prometheus-text metrics snapshot, redaction tests, `cargo llvm-cov` ≥80% coverage gate on core/catalog/engine).
-7. **Next:** PR 1 is on `main`. Continue at **PR 1.5**, then PR 2. Prefer a branch + pull request. Do not skip ahead to providers or apply.
+6. **PR 1 merged:** Cargo workspace, eight crate stubs, `portage --help`, `portage init`.
+7. **PR 1.5 merged:** `portage-core::obs` — JSONL logging with enforced redaction, metrics registry, Prometheus snapshot, `portage status`, CI coverage gate (≥80% on core/catalog/engine).
+8. **PR 2 opened:** `portage-core` ids (BLAKE3 `ContentId`, typed ids), streaming `MultiHasher` (BLAKE3+MD5/SHA1/SHA256, 1 MiB buffer), `QuickHash` 64 KiB prefilter, `paths::ensure_inside` (traversal/ADS/symlink containment). QuickXor deferred to PR 8.
+9. **Next:** merge PR 2, then **PR 3** (SQLite catalog schema, migrations, single-writer lock).
 
 ---
 
 ## Next steps (ordered)
 
-1. PR 1 — Cargo workspace, eight crate stubs, `portage --help`, `portage init` (measure C:, recommend `data_dir` if C: < 8 GiB), copy example config, rust-toolchain. CI `cargo` steps start running.
-2. PR 1.5 — observability foundation: `portage-core::obs` (tracing JSONL + redaction + metrics registry), `status --format=prom`, coverage gate in CI.
-3. Follow PRs 2–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests. Every PR: unit tests + ≥1 integration test per touched boundary.
+1. PR 3 — SQLite catalog: schema, migrations, single-writer `portage.lock` enforcement.
+2. Follow PRs 4–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests. Every PR: unit tests + ≥1 integration test per touched boundary.
 4. PR 14 polish → PR 15 `portage-tui` → PR 16 `portage ask` (clarify-then-plan agent, local or online).
 5. Keep this file's **Stopped at** current.
 
@@ -83,22 +84,20 @@ portage-app/
   docs/design.md
   docs/FEATURES.md
   configs/examples/gaming-clips.yaml
-  .github/workflows/ci.yml   # cargo steps skipped until Cargo.toml exists
-  src/                       # unused; code will live in crates/ after PR 1
-  tests/
-  scripts/
-  samples/
+  .github/workflows/ci.yml   # build/test/clippy/fmt matrix + coverage gate
+  crates/portage-core/       # error, units, obs (JSONL+metrics), ids, hash, paths
+  crates/portage-{catalog,auth,providers,media,engine,cli,sim}/  # stubs
 ```
 
 ### Commands
 
 ```powershell
 cd C:\Repos\portage-app
-git status
-git log -1 --oneline
+cargo run -p portage-cli -- --help
+cargo run -p portage-cli -- init
+cargo run -p portage-cli -- status --format=prom
+cargo test --workspace
 ```
-
-No `portage` binary yet.
 
 ---
 
@@ -106,9 +105,9 @@ No `portage` binary yet.
 
 | Item | Notes |
 |------|--------|
-| PR 1 workspace + CLI stub | First implementation slice |
-| PR 1.5 observability | JSONL logs + prom metrics snapshot + coverage gate |
-| PR 2–5 local inventory | Useful on D: of clips before any cloud |
+| ~~PR 1 workspace + CLI stub~~ | Merged (#5) |
+| ~~PR 1.5 observability~~ | Merged (#7) |
+| PR 2–5 local inventory | PR 2 (ids/hash/paths) in review; useful on D: of clips before any cloud |
 | PR 6–8 Drive + OneDrive read | Unified inventory, still no mutations |
 | PR 9–10 planner dry-run | 4 GiB fixture, no writes |
 | PR 11–13 confirmed apply + undo | First real transfers; P0 no-data-loss gate |

@@ -30,4 +30,32 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+
+    /// A string failed to parse as a typed id (e.g. `b3:<64 hex>`).
+    #[error("invalid {what}: {input}")]
+    InvalidId {
+        /// What was being parsed.
+        what: &'static str,
+        /// The offending input (truncated by the caller if huge).
+        input: String,
+    },
+
+    /// A hash algorithm was requested that this build cannot compute yet.
+    #[error("unsupported hash algorithm: {0}")]
+    UnsupportedHashAlgo(String),
+
+    /// A candidate path escapes its root (traversal, ADS, or symlink escape).
+    #[error("path {} escapes root {}: {reason}", candidate.display(), root.display())]
+    PathEscape {
+        /// The registered root.
+        root: PathBuf,
+        /// The rejected candidate.
+        candidate: PathBuf,
+        /// Why it was rejected.
+        reason: String,
+    },
+
+    /// A safety invariant was violated; the current plan must stop.
+    #[error("invariant violated: {0}")]
+    Invariant(String),
 }

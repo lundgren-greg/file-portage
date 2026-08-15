@@ -19,11 +19,16 @@ repository = "https://github.com/lundgren-greg/portage-app"
 
 [workspace.dependencies]
 anyhow = "1"
-thiserror = "2"
+blake3 = "1"
 clap = { version = "4", features = ["derive"] }
 fs2 = "0.4"
+hex = "0.4"
+md-5 = "0.10"
 serde_json = "1"
+sha1 = "0.10"
+sha2 = "0.10"
 tempfile = "3"
+thiserror = "2"
 time = { version = "0.3", features = ["formatting"] }
 tracing = "0.1"
 tracing-appender = "0.2"
