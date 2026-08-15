@@ -26,7 +26,8 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 1. Created `lundgren-greg/file-portage` from `repo-template` (Rust CI, MIT).
 2. Wrote and reviewed the design (`docs/design.md`). Reviewer approved after 3 rounds.
 3. Checked in feature set (`docs/FEATURES.md`) and `configs/examples/gaming-clips.yaml`.
-4. **Next session / implementation agent: execute PR 1** in `docs/design.md` (workspace + CLI stub). Branch + pull request; do not push `main`. Do not skip ahead to providers or apply.
+4. Wiki draft lives in `docs/wiki/`. GitHub Wiki tab needs one “Create the first page” click, then `.\scripts\Publish-Wiki.ps1`.
+5. **Next session / implementation agent: execute PR 1** in `docs/design.md` (workspace + CLI stub). Branch + pull request; do not push `main`. Do not skip ahead to providers or apply.
 
 ---
 
