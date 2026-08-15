@@ -10,8 +10,8 @@
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
 | **Remote** | `origin` → https://github.com/lundgren-greg/portage-app.git |
-| **Status** | Public. PR 1 is on main. Next: PR 1.5. |
-| **Updated** | 2026-08-14 |
+| **Status** | Public. PRs 1, 1.5, 2 are on main. Next: PR 3 review/merge. |
+| **Updated** | 2026-08-15 |
 
 ---
 
@@ -30,15 +30,16 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 5. Ported the brainstorm decisions (`docs/brainstorm.md`): clarify-then-plan agent, **local or online** LLM (Grok default; Ollama/LM Studio), desire + priority `Intent`, redacted catalog digest for online providers.
 6. **PR 1 merged:** Cargo workspace, eight crate stubs, `portage --help`, `portage init`.
 7. **PR 1.5 merged:** `portage-core::obs` — JSONL logging with enforced redaction, metrics registry, Prometheus snapshot, `portage status`, CI coverage gate (≥80% on core/catalog/engine).
-8. **PR 2 opened:** `portage-core` ids (BLAKE3 `ContentId`, typed ids), streaming `MultiHasher` (BLAKE3+MD5/SHA1/SHA256, 1 MiB buffer), `QuickHash` 64 KiB prefilter, `paths::ensure_inside` (traversal/ADS/symlink containment). QuickXor deferred to PR 8.
-9. **Next:** merge PR 2, then **PR 3** (SQLite catalog schema, migrations, single-writer lock).
+8. **PR 2 merged:** `portage-core` ids (BLAKE3 `ContentId`, typed ids), streaming `MultiHasher` (BLAKE3+MD5/SHA1/SHA256, 1 MiB buffer), `QuickHash` 64 KiB prefilter, `paths::ensure_inside` (traversal/ADS/symlink containment). QuickXor deferred to PR 8.
+9. **PR 3 opened:** SQLite catalog — `migrations/0001_init.sql` + `0002_plans_journal.sql`, WAL/foreign_keys/busy_timeout at open, migrations via `PRAGMA user_version`, exclusive/shared `portage.lock` enforcement (`catalog locked by pid N`), batched file inserts with proto-blob + `suspect` replica (placeholders excluded), lookup by path and `ContentId`, scans, capacity snapshots, `portage-core::config` paths, `portage doctor` stub (`integrity_check` + FK check).
+10. **Next:** merge PR 3, then **PR 4** (local provider: volumes, overlay roots, placeholders, walk).
 
 ---
 
 ## Next steps (ordered)
 
-1. PR 3 — SQLite catalog: schema, migrations, single-writer `portage.lock` enforcement.
-2. Follow PRs 4–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests. Every PR: unit tests + ≥1 integration test per touched boundary.
+1. PR 4 — local provider: volumes, overlay roots, placeholder detection, NTFS walk.
+2. Follow PRs 5–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests. Every PR: unit tests + ≥1 integration test per touched boundary.
 4. PR 14 polish → PR 15 `portage-tui` → PR 16 `portage ask` (clarify-then-plan agent, local or online).
 5. Keep this file's **Stopped at** current.
 
@@ -85,8 +86,11 @@ portage-app/
   docs/FEATURES.md
   configs/examples/gaming-clips.yaml
   .github/workflows/ci.yml   # build/test/clippy/fmt matrix + coverage gate
-  crates/portage-core/       # error, units, obs (JSONL+metrics), ids, hash, paths
-  crates/portage-{catalog,auth,providers,media,engine,cli,sim}/  # stubs
+  migrations/                # 0001_init.sql, 0002_plans_journal.sql
+  crates/portage-core/       # error, units, obs (JSONL+metrics), ids, hash, paths, config
+  crates/portage-catalog/    # db (open/migrate), lock, files, blobs, replicas, scans, capacity
+  crates/portage-{auth,providers,media,engine,sim}/  # stubs
+  crates/portage-cli/        # init, status, doctor
 ```
 
 ### Commands
@@ -96,6 +100,7 @@ cd C:\Repos\portage-app
 cargo run -p portage-cli -- --help
 cargo run -p portage-cli -- init
 cargo run -p portage-cli -- status --format=prom
+cargo run -p portage-cli -- doctor
 cargo test --workspace
 ```
 
@@ -107,7 +112,7 @@ cargo test --workspace
 |------|--------|
 | ~~PR 1 workspace + CLI stub~~ | Merged (#5) |
 | ~~PR 1.5 observability~~ | Merged (#7) |
-| PR 2–5 local inventory | PR 2 (ids/hash/paths) in review; useful on D: of clips before any cloud |
+| PR 2–5 local inventory | PR 2 merged (#8); PR 3 (catalog) in review; useful on D: of clips before any cloud |
 | PR 6–8 Drive + OneDrive read | Unified inventory, still no mutations |
 | PR 9–10 planner dry-run | 4 GiB fixture, no writes |
 | PR 11–13 confirmed apply + undo | First real transfers; P0 no-data-loss gate |

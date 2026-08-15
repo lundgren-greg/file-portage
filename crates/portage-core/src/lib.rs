@@ -1,8 +1,9 @@
 //! Core types shared by every Portage crate.
 //!
 //! Errors, byte units, observability, typed identifiers, streaming hashes,
-//! and path containment. Config loading arrives with the catalog work.
+//! path containment, and data-dir/config/catalog path resolution.
 
+pub mod config;
 pub mod error;
 pub mod hash;
 pub mod ids;

@@ -14,6 +14,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 clap = { workspace = true }
 fs2 = { workspace = true }
+portage-catalog = { path = "../portage-catalog" }
 portage-core = { path = "../portage-core" }
 tracing = { workspace = true }
 

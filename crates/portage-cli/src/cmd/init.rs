@@ -140,16 +140,8 @@ fn example_config() -> &'static str {
 
 /// Default data dir: `%LOCALAPPDATA%\Portage` or `~/.local/share/portage`.
 pub fn default_data_dir() -> Result<PathBuf> {
-    #[cfg(windows)]
-    {
-        let base = std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
-        Ok(PathBuf::from(base).join("Portage"))
-    }
-    #[cfg(not(windows))]
-    {
-        let home = std::env::var_os("HOME").context("HOME is not set")?;
-        Ok(PathBuf::from(home).join(".local/share/portage"))
-    }
+    portage_core::config::default_data_dir()
+        .context("LOCALAPPDATA (Windows) or HOME (Unix) is not set")
 }
 
 /// Walk up until an existing ancestor is found (the dir may not exist yet).
