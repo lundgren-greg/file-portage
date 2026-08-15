@@ -1,11 +1,11 @@
 # portage-app — project tracker
 
 > **Resume here** when starting a new session. Keep this file current when you stop work.
-> Optional Grok-Context thread: `C:\Repos\Grok-Context\threads\file-portage\`
+> Brainstorm / convo context: [`docs/brainstorm.md`](docs/brainstorm.md)
 
 | Field | Value |
 |-------|--------|
-| **Local path** | `C:\Repos\file-portage` |
+| **Local path** | `C:\Repos\portage-app` |
 | **GitHub** | `lundgren-greg/portage-app` |
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
@@ -27,16 +27,19 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 2. Wrote and reviewed the design (`docs/design.md`). Reviewer approved after 3 rounds.
 3. Checked in feature set (`docs/FEATURES.md`) and `configs/examples/gaming-clips.yaml`.
 4. Wiki draft lives in `docs/wiki/`. GitHub Wiki tab needs one “Create the first page” click, then `.\scripts\Publish-Wiki.ps1`.
-5. **Next session / implementation agent: execute PR 1** in `docs/design.md` (workspace + CLI stub). Branch + pull request; do not push `main`. Do not skip ahead to providers or apply.
+5. Ported the brainstorm decisions (`docs/brainstorm.md`): clarify-then-plan agent, **local or online** LLM (Grok default; Ollama/LM Studio), desire + priority `Intent`, redacted catalog digest for online providers.
+6. Plan updated: new **PR 1.5** (JSON-lines logs for Grafana Alloy/Loki, Prometheus-text metrics snapshot, redaction tests, `cargo llvm-cov` ≥80% coverage gate on core/catalog/engine).
+7. **Next session / implementation agent: execute PR 1, then PR 1.5** in `docs/design.md`. Branch + pull request; do not push `main`. Do not skip ahead to providers or apply.
 
 ---
 
 ## Next steps (ordered)
 
 1. PR 1 — Cargo workspace, eight crate stubs, `portage --help`, `portage init` (measure C:, recommend `data_dir` if C: < 8 GiB), copy example config, rust-toolchain. CI `cargo` steps start running.
-2. Follow PRs 2–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests.
-3. PR 14 polish → PR 15 `portage-tui` → PR 16 `portage ask` / Grok.
-4. Keep this file's **Stopped at** current.
+2. PR 1.5 — observability foundation: `portage-core::obs` (tracing JSONL + redaction + metrics registry), `status --format=prom`, coverage gate in CI.
+3. Follow PRs 2–13 exactly as written. **No-data-loss P0** (apply + undo refuse) before TUI/NL. Merge gates for planner PRs: P-space and P-last-copy tests. Every PR: unit tests + ≥1 integration test per touched boundary.
+4. PR 14 polish → PR 15 `portage-tui` → PR 16 `portage ask` (clarify-then-plan agent, local or online).
+5. Keep this file's **Stopped at** current.
 
 ---
 
@@ -54,7 +57,7 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 |---|----------|--------|
 | 1 | OAuth client ids | **BYO in R1:** `PORTAGE_GOOGLE_CLIENT_ID`, `PORTAGE_MS_CLIENT_ID` |
 | 2 | OneDrive scope | **Personal `/me/drive` in Release 1.** M365/SharePoint = **Release 2** |
-| 3 | Interaction / keep_local | **LLM front door (Grok first).** Compiles to policy + plan. **Never applies.** Gaming Clips default `prefer` + warning; “must stay on C:” → `required`. Browser PKCE UX. |
+| 3 | Interaction / keep_local | **Clarify-then-plan agent (local or online).** Desire + priority → questions → Intent → dry-run. **Never applies.** Default `prefer` + warning; “must stay on C:” → `required`. |
 | 4 | Undo / data loss | **No data loss = R1 P0.** Reverse-plan + second typed id. Refuse last-copy or reserve breach. Never auto-redownload. |
 | 5 | Catalog location | `init` measures C:. If < 8 GiB, recommend largest non-overlay volume. NL may confirm `data_dir`. Engine rejects unsafe dirs. No silent move. |
 | 6 | Google scope | **Full `drive`.** Consent copy explains why `drive.file` cannot inventory existing clips. |
@@ -74,7 +77,7 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 ### Layout
 
 ```
-file-portage/
+portage-app/
   PROJECT.md
   README.md, LICENSE, SECURITY.md, CODEOWNERS, AGENTS.md
   docs/design.md
@@ -90,7 +93,7 @@ file-portage/
 ### Commands
 
 ```powershell
-cd C:\Repos\file-portage
+cd C:\Repos\portage-app
 git status
 git log -1 --oneline
 ```
@@ -104,6 +107,7 @@ No `portage` binary yet.
 | Item | Notes |
 |------|--------|
 | PR 1 workspace + CLI stub | First implementation slice |
+| PR 1.5 observability | JSONL logs + prom metrics snapshot + coverage gate |
 | PR 2–5 local inventory | Useful on D: of clips before any cloud |
 | PR 6–8 Drive + OneDrive read | Unified inventory, still no mutations |
 | PR 9–10 planner dry-run | 4 GiB fixture, no writes |
@@ -128,6 +132,9 @@ No `portage` binary yet.
 | 2026-08-14 | Repo is **public**. `main` is PR-only. CODEOWNERS `* @lundgren-greg`. Greg reviews and merges everything. |
 | 2026-08-15 | External / USB volumes are first-class (`shuttle` hop and/or `final` dest; identity = volume serial). README leads with capabilities and names concrete situations (gaming clips **and** docs, archives, full disk, dups) so the audience is not one niche. |
 | 2026-08-14 | User resolved open questions: BYO OAuth; personal OneDrive in R1 / M365 in R2; Grok-first NL never applies; no-data-loss P0; undo = reverse-plan + second id; init+NL catalog recommendation with engine reject; full Google `drive`; TUI PR 15 after safety MVP. |
+| 2026-08-15 | NL is a **clarify-then-plan agent** (desire + priority, ≤3 clarify rounds), **local or online**: Grok default, any OpenAI-compatible localhost (Ollama/LM Studio). Online sees a redacted catalog digest unless `nl.send_paths`. Source: `docs/brainstorm.md`. |
+| 2026-08-15 | Observability: structured **JSON-lines logs** + **Prometheus-text metrics snapshot**, local files only (Grafana Alloy/Loki/textfile-collector friendly). No listener, no push, no telemetry. New **PR 1.5**. |
+| 2026-08-15 | Testing: CI `cargo llvm-cov` gate ≥80% on core/catalog/engine; every PR ships unit tests + ≥1 integration test per touched boundary; redaction tests merge-blocking. |
 
 ---
 
@@ -137,7 +144,7 @@ When starting a new agent/chat session:
 
 1. Read **this file** (`PROJECT.md`).
 2. Read `docs/design.md` **PR Plan** and implement the next unchecked PR only.
-3. `git -C C:\Repos\file-portage status` and `git log -1 --oneline`.
+3. `git -C C:\Repos\portage-app status` and `git log -1 --oneline`.
 4. `gh auth status`.
 5. Update **Stopped at** / **Next steps** before ending the session.
 

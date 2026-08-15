@@ -49,7 +49,7 @@ The drive is identified by **volume serial**, not letter. If it is unplugged, an
 
 **Confirm before anything mutates.** `portage plan` is a dry run. `portage apply` rejects `y` / `yes` / Enter. Undo is a reverse plan you confirm with a second id, and it refuses if that reverse would lose the last copy or breach the reserve.
 
-**Ask in plain language (after the safety MVP).** `portage ask "keep my gaming clips on D: and whichever cloud has more space"` or `"put the archive folder on the USB drive and Google Drive"` compiles to policy + a plan. It does not apply.
+**Say what goes where, and what to do first.** After the safety MVP, `portage ask` is a short conversation with an agent that is **on this PC or online** (Grok by default; Ollama / LM Studio if you want names to stay local). You state desire and priority — “free C: first, keep clips on D: and the cloud with more space, use the USB as the hop.” It asks until that is clear, then prints a plan. **It does not apply.** You type the plan id.
 
 ## Status
 
@@ -65,7 +65,7 @@ The drive is identified by **volume serial**, not letter. If it is unplugged, an
 - Space-safe planner with residual free space after every step. User types the plan id to apply.
 - Serial executor, crash journal, last-copy permit, private-only ACL assert, no silent overwrite.
 - **No data loss is Release 1 P0.** Undo is a reverse plan you confirm with a second plan id.
-- Natural language (`portage ask`) via Grok first (`XAI_API_KEY`). Compiles intent → plan. Never applies.
+- Clarify-then-plan agent (`portage ask`): desire + priority, local or online. Never applies.
 - `portage-tui` (ratatui) after the safety MVP: color, hotkeys, plan review. Apply still types the plan id.
 
 ## Architecture

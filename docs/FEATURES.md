@@ -59,6 +59,9 @@ These are not optional polish. They ship before TUI and before NL compile-to-pla
 
 ### Safety / ops
 
+- [ ] Structured **JSON-lines logs** (`%data_dir%/logs/portage.YYYY-MM-DD.jsonl`, 10 MiB × 7) with stable fields — scrapeable by a user-run Grafana Alloy/Promtail → Loki. Redaction layer (tokens / `Authorization` / `session_uri`) with merge-blocking unit tests.
+- [ ] **Prometheus-text metrics snapshot**: `portage status --format=prom` + atomic `%data_dir%/metrics/portage.prom` for a local textfile collector. No listener, no push, no telemetry.
+- [ ] CI **coverage gate**: `cargo llvm-cov` ≥ 80% line coverage on core/catalog/engine. Every PR ships unit tests + ≥1 integration test per touched boundary.
 - [ ] Tokens in OS keyring; Windows fallback `%data_dir%/tokens.dpapi`. Never YAML.
 - [ ] OAuth UX: open browser → pick Google/Microsoft account → approve → return. BYO `PORTAGE_GOOGLE_CLIENT_ID` / `PORTAGE_MS_CLIENT_ID`. Full Google `drive` scope; consent copy explains why `drive.file` cannot inventory existing clips.
 - [ ] `undo` builds a reverse plan and requires a second typed id; refuses last-copy / reserve breaches.
@@ -69,7 +72,7 @@ These are not optional polish. They ship before TUI and before NL compile-to-pla
 ## Release 1 after safety MVP (PRs 15–16)
 
 - [ ] **PR 15** `portage-tui` (ratatui): color inventory/plan review, hotkeys, configurable theme. Apply still requires typing the plan id. Does not block PRs 1–13.
-- [ ] **PR 16** `portage ask` / `portage-nl`: Grok first (`XAI_API_KEY`, `https://api.x.ai/v1`, `grok-4.5` — re-check docs.x.ai). `LlmProvider` trait for later vendors. Compiles utterances → policy + dry-run plan. **LLM never applies.** Optional read-only stub after PR 5 (search/dups/list only).
+- [ ] **PR 16** Clarify-then-plan agent (`portage ask` / `portage-nl`). Desire (what goes where) + priority (what to free or keep first). Up to 3 clarify questions, then a dry-run. **Grok online** and **local** OpenAI-compatible (Ollama / LM Studio). Online sees a redacted catalog digest unless `nl.send_paths`. **Never applies.** Optional read-only stub after PR 5.
 
 ## Future releases (not R1)
 

@@ -6,7 +6,7 @@ Locked with Greg. Treat these as final until he changes them in a PR or here.
 |---|---|---|
 | 1 | OAuth client ids | Bring-your-own in R1 (`PORTAGE_GOOGLE_CLIENT_ID`, `PORTAGE_MS_CLIENT_ID`). Browser → pick account → approve → return. |
 | 2 | OneDrive | Personal `/me/drive` in Release 1. Microsoft 365 / SharePoint is Release 2. |
-| 3 | Talking to it | Grok-first NL (`portage ask`). Compiles to policy + plan. **Never applies.** Other vendors later via a trait. |
+| 3 | Talking to it | Clarify-then-plan agent. You state **desire** (what goes where) and **priority** (what to free or keep first). Agent asks until `Intent` is clear, then the planner prints a dry-run. **Never applies.** **Local or online** (Grok default; Ollama/LM Studio for on-box). |
 | 4 | Undo | Reverse plan + second typed id. Refuse last-copy or reserve breach. Never auto-redownload. |
 | 5 | Catalog location | `init` measures C:. If C: < 8 GiB, recommend the largest safe non-overlay volume. NL may confirm. Engine rejects unsafe dirs. No silent move. |
 | 6 | Google scope | Full `drive` so existing files can be inventoried. Consent copy explains why `drive.file` cannot. |
