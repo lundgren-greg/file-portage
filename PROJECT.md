@@ -10,7 +10,7 @@
 | **Branch** | `main` |
 | **Last commit** | Run `git log -1 --oneline` |
 | **Remote** | `origin` → https://github.com/lundgren-greg/portage-app.git |
-| **Status** | Public. `main` is PR-only; Greg (`@lundgren-greg`) reviews every merge. Design approved. Next: PR 1. |
+| **Status** | Public. Others use PRs. Greg (`@lundgren-greg`) can push `main` and merge his own PRs. PR 1 is on main. Next: PR 1.5. |
 | **Updated** | 2026-08-14 |
 
 ---
@@ -29,7 +29,7 @@ Ship a Windows-first tool (`portage` CLI, then `portage-tui`, plus `portage ask`
 4. Wiki draft lives in `docs/wiki/`. GitHub Wiki tab needs one “Create the first page” click, then `.\scripts\Publish-Wiki.ps1`.
 5. Ported the brainstorm decisions (`docs/brainstorm.md`): clarify-then-plan agent, **local or online** LLM (Grok default; Ollama/LM Studio), desire + priority `Intent`, redacted catalog digest for online providers.
 6. Plan updated: new **PR 1.5** (JSON-lines logs for Grafana Alloy/Loki, Prometheus-text metrics snapshot, redaction tests, `cargo llvm-cov` ≥80% coverage gate on core/catalog/engine).
-7. **Next session / implementation agent: execute PR 1, then PR 1.5** in `docs/design.md`. Branch + pull request; do not push `main`. Do not skip ahead to providers or apply.
+7. **Next:** PR 1 is on `main`. Implementation agent continues at **PR 1.5**, then PR 2. Agents use a branch + pull request. Greg may push `main`. Do not skip ahead to providers or apply.
 
 ---
 
@@ -129,7 +129,8 @@ No `portage` binary yet.
 | 2026-08-14 | Cloud-to-cloud is always a local shuttle. Placeholders are not replicas. |
 | 2026-08-14 | Apply requires typing the plan id. Last-copy + private ACL + staging reserve are non-negotiable. |
 | 2026-08-14 | Design approved after 3 review rounds. Source of truth: `docs/design.md`. |
-| 2026-08-14 | Repo is **public**. `main` is PR-only. CODEOWNERS `* @lundgren-greg`. Greg reviews and merges everything. |
+| 2026-08-14 | Repo is **public**. CODEOWNERS `* @lundgren-greg`. |
+| 2026-08-15 | Greg can push `main` and merge his own PRs (`bypass_mode: always`). Others still need a PR + his review + CI. |
 | 2026-08-15 | External / USB volumes are first-class (`shuttle` hop and/or `final` dest; identity = volume serial). README leads with capabilities and names concrete situations (gaming clips **and** docs, archives, full disk, dups) so the audience is not one niche. |
 | 2026-08-14 | User resolved open questions: BYO OAuth; personal OneDrive in R1 / M365 in R2; Grok-first NL never applies; no-data-loss P0; undo = reverse-plan + second id; init+NL catalog recommendation with engine reject; full Google `drive`; TUI PR 15 after safety MVP. |
 | 2026-08-15 | NL is a **clarify-then-plan agent** (desire + priority, ≤3 clarify rounds), **local or online**: Grok default, any OpenAI-compatible localhost (Ollama/LM Studio). Online sees a redacted catalog digest unless `nl.send_paths`. Source: `docs/brainstorm.md`. |

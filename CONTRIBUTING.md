@@ -3,9 +3,10 @@
 This is Greg's project ([@lundgren-greg](https://github.com/lundgren-greg)).
 External PRs are welcome for bugs and small fixes; larger changes should start as an issue.
 
-**Nothing is pushed to `main`.** Every change lands through a pull request that Greg
-reviews and merges. `CODEOWNERS` requires `@lundgren-greg` on every path. Force-push
-and deleting `main` are blocked.
+**Everyone except Greg** lands on `main` through a pull request. `CODEOWNERS` requires
+`@lundgren-greg` on every path. Greg (`@lundgren-greg`) can push `main` and merge
+his own PRs without a second reviewer. GitHub still will not let anyone *approve*
+their own PR; his bypass is the owner override.
 
 ## Before you start
 
@@ -16,7 +17,7 @@ and deleting `main` are blocked.
 
 ## Workflow
 
-1. Branch from `main`. Do not commit on `main`.
+1. Branch from `main` (Greg may commit on `main`).
 2. Add or update tests with the behavior change.
 3. Run the CI-equivalent commands locally.
 4. Open a PR against `main`. Fill in the PR template.

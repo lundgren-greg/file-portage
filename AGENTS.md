@@ -16,7 +16,7 @@ This repo is a **greenfield** app. The approved design is [`docs/design.md`](doc
 - Windows-first. Linux/macOS must still compile.
 - Local-first. No telemetry. Cloud I/O only after the user runs `provider add` / `apply`.
 - Never commit secrets, tokens, catalogs of real files, or OAuth client secrets.
-- **Never push or merge to `main`.** Open a pull request. Greg (`@lundgren-greg`) is the code owner and the only merger.
+- **Agents / contributors:** open a pull request. Do not push `main` unless you are Greg (`@lundgren-greg`). He can push `main` and merge his own PRs.
 - No force-push or history rewrite on `main`.
 - **Never** add share-link, `anyoneWithLink`, or public ACL APIs. CI must `rg` for them.
 - **Never** open OneDrive / DriveFS placeholders. Overlay roots are not local replicas.

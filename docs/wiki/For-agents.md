@@ -13,7 +13,7 @@ You are continuing Portage. Greg may be away. Do not invent a new architecture.
 
 Implement **PR 1 only**: Cargo workspace, eight crate stubs, `portage --help`, `portage init` (measure C:, recommend `data_dir` if C: < 8 GiB), rust-toolchain, example config copy.
 
-Branch + pull request. **Do not push `main`.**
+Agents: branch + pull request. **Do not push `main` unless you are Greg.** He may push `main` directly.
 
 ## Do not
 

@@ -146,7 +146,7 @@ See [SECURITY.md](SECURITY.md). Cloud transfers are opt-in after `provider add`.
 - Read [PROJECT.md](PROJECT.md) first.
 - Implement in the order in [docs/design.md](docs/design.md) **PR Plan**.
 - Keep CI green.
-- **`main` is PR-only.** Branch, open a pull request, wait for CI. [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`) is the code owner and the only person who merges.
+- **Contributors** open a pull request and wait for CI. [Greg](https://github.com/lundgren-greg) (`@lundgren-greg`) is the code owner. He can merge his own PRs and push `main` directly.
 
 ## Roadmap (high level)
 

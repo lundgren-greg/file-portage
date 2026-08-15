@@ -17,5 +17,5 @@ cd C:\Repos\portage-app
 | [External drives](External-drives.md) | USB as hop and/or home |
 | [Decisions](Decisions.md) | Answers already locked |
 | [Roadmap](Roadmap.md) | PR 1 → 16 |
-| [How we work](How-we-work.md) | Public repo, PR-only `main` |
+| [How we work](How-we-work.md) | Public repo. Others use PRs. Greg can push `main`. |
 | [For agents](For-agents.md) | Next session |
