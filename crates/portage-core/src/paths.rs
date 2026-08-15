@@ -27,21 +27,19 @@ pub fn ensure_inside(root: &Path, candidate: &Path) -> Result<PathBuf, Error> {
     };
 
     // Lexical screening of the candidate's own components.
-    let relative = if candidate.is_absolute() {
-        candidate
-            .strip_prefix(root)
-            .map_err(|_| escape("absolute path is outside the root"))?
-    } else {
-        candidate
-    };
-    for component in relative.components() {
+    // Avoid `strip_prefix(root)` for absolute candidates: it is purely lexical and can
+    // reject valid paths that differ only in representation (e.g., casing, `.`).
+    let mut allow_root_prefix = candidate.is_absolute();
+    for component in candidate.components() {
         match component {
             Component::ParentDir => return Err(escape("contains `..`")),
+            Component::RootDir | Component::Prefix(_) if allow_root_prefix => {}
             Component::RootDir | Component::Prefix(_) => {
                 return Err(escape("contains a root or drive prefix"))
             }
-            Component::CurDir => {}
+            Component::CurDir => allow_root_prefix = false,
             Component::Normal(part) => {
+                allow_root_prefix = false;
                 let part = part.to_string_lossy();
                 if part.contains(':') {
                     return Err(escape("contains `:` (NTFS alternate data stream)"));
@@ -50,7 +48,7 @@ pub fn ensure_inside(root: &Path, candidate: &Path) -> Result<PathBuf, Error> {
         }
     }
 
-    let joined = root.join(relative);
+    let joined = root.join(candidate);
 
     // Filesystem check: the deepest existing ancestor must resolve inside root.
     let canonical_root = root.canonicalize().map_err(|source| Error::Io {
