@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
@@ -40,9 +40,9 @@ impl Catalog {
     /// `portage.lock` in `mode` for the life of the returned value.
     pub fn open(data_dir: &Path, mode: LockMode) -> Result<Self> {
         let lock = CatalogLock::acquire(&portage_core::config::lock_path(data_dir), mode)?;
-        let conn = Connection::open(portage_core::config::catalog_path(data_dir))?;
+        let mut conn = Connection::open(portage_core::config::catalog_path(data_dir))?;
         configure(&conn)?;
-        migrate(&conn)?;
+        migrate(&mut conn)?;
         Ok(Self { conn, _lock: lock })
     }
 
@@ -146,26 +146,20 @@ fn configure(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn migrate(conn: &Connection) -> Result<()> {
+fn migrate(conn: &mut Connection) -> Result<()> {
     for &(version, name, sql) in MIGRATIONS {
         // Check-and-apply inside one immediate transaction so concurrent
-        // shared openers cannot double-apply a migration.
-        conn.execute_batch("BEGIN IMMEDIATE")?;
-        let applied: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        // shared openers cannot double-apply a migration. Dropping the
+        // transaction without commit rolls it back (RAII).
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let applied: i64 = tx.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         if applied >= version {
-            conn.execute_batch("COMMIT")?;
             continue;
         }
-        let result = conn
-            .execute_batch(sql)
-            .and_then(|()| conn.pragma_update(None, "user_version", version));
-        match result {
-            Ok(()) => conn.execute_batch("COMMIT")?,
-            Err(source) => {
-                let _ = conn.execute_batch("ROLLBACK");
-                return Err(Error::Migration { name, source });
-            }
-        }
+        tx.execute_batch(sql)
+            .and_then(|()| tx.pragma_update(None, "user_version", version))
+            .map_err(|source| Error::Migration { name, source })?;
+        tx.commit()?;
     }
     Ok(())
 }

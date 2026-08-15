@@ -1,10 +1,10 @@
 //! File rows: batched insert with proto-blob creation, and lookups.
 //!
 //! Inserting a `byte` file that is a real copy (any hydration except
-//! `placeholder`) creates a **proto-blob** — a `blobs` row whose
-//! `content_id` is NULL until PR 5 hashes it — plus a `suspect` replica.
-//! Placeholders never get a blob or replica: a placeholder is not a copy
-//! (design K6/K10). Directories and shortcuts carry no bytes.
+//! `placeholder`) with a known size creates a **proto-blob** — a `blobs`
+//! row whose `content_id` is NULL until PR 5 hashes it — plus a `suspect`
+//! replica. Placeholders never get a blob or replica: a placeholder is not
+//! a copy (design K6/K10). Directories and shortcuts carry no bytes.
 
 use rusqlite::{OptionalExtension, Row};
 
@@ -199,14 +199,19 @@ impl Catalog {
                     |row| row.get(0),
                 )?;
 
-                // Proto-blob: only real byte copies. Placeholders are not
-                // copies; directories and shortcuts have no bytes.
-                let is_copy =
-                    file.kind == FileKind::Byte && file.hydration != Hydration::Placeholder;
+                // Proto-blob: only real byte copies of known size (blobs.size
+                // is NOT NULL and 0 would masquerade as an empty file).
+                // Placeholders are not copies; directories and shortcuts
+                // have no bytes. A later scan that learns the size will
+                // create the blob then.
+                let is_copy = file.kind == FileKind::Byte
+                    && file.hydration != Hydration::Placeholder
+                    && file.size.is_some();
                 if is_copy {
                     let existing: i64 = has_replica.query_row([file_id], |row| row.get(0))?;
                     if existing == 0 {
-                        insert_blob.execute([crate::db::to_db_u64(file.size.unwrap_or(0))])?;
+                        insert_blob
+                            .execute([crate::db::to_db_u64(file.size.unwrap_or_default())])?;
                         let blob_id = tx.last_insert_rowid();
                         insert_replica.execute((blob_id, file_id))?;
                     }
@@ -339,6 +344,31 @@ mod tests {
             .query_row("SELECT count(*) FROM blobs", [], |r| r.get(0))
             .unwrap();
         assert_eq!(blobs, 1, "no duplicate proto-blob on re-scan");
+    }
+
+    #[test]
+    fn unknown_size_defers_the_proto_blob_until_a_scan_learns_it() {
+        let (_dir, mut catalog) = seeded();
+        let first = scan(&catalog);
+        let mut unknown = NewFile::local_byte("odd.bin", "odd.bin", 0);
+        unknown.size = None;
+        let ids = catalog.insert_files("vol-1", first, &[unknown]).unwrap();
+
+        assert!(
+            catalog.blob_for_file(ids[0]).unwrap().is_none(),
+            "no proto-blob for an unknown size — 0 would look like an empty file"
+        );
+
+        let second = scan(&catalog);
+        catalog
+            .insert_files(
+                "vol-1",
+                second,
+                &[NewFile::local_byte("odd.bin", "odd.bin", 77)],
+            )
+            .unwrap();
+        let blob = catalog.blob_for_file(ids[0]).unwrap().unwrap();
+        assert_eq!(blob.size, 77);
     }
 
     #[test]
