@@ -8,7 +8,7 @@
 | **Status** | Approved (review 2026-08-14, 3 rounds; user questions resolved 2026-08-14) |
 | **Product name** | **Portage** |
 | **CLI / binary** | `portage` |
-| **GitHub repo** | `lundgren-greg/file-portage` |
+| **GitHub repo** | `lundgren-greg/portage-app` |
 | **License** | MIT |
 | **Primary OS** | Windows 10/11 (NTFS). Linux and macOS must compile and run local+cloud paths; Windows-only APIs are isolated behind traits. |
 
@@ -16,7 +16,7 @@
 
 **Keep the product name Portage.** The metaphor is exact: cargo is carried overland between two bodies of water because you cannot sail the gap. Here the “land” is a space-constrained local disk and the “waters” are cloud providers. Users already have the working name.
 
-**Do not name the GitHub repository `portage`.** That name is owned in most engineers’ heads by Gentoo’s package manager. Use **`file-portage`**. The binary stays `portage`. Crate names are `portage-*`.
+**Do not name the GitHub repository `portage`.** That name is owned in most engineers’ heads by Gentoo’s package manager. Use **`portage-app`**. The product and binary stay **Portage** / `portage`. Crate names are `portage-*`.
 
 Rejected names: Ferry (too generic, collisions), Stow (too cute, unclear), Manifest (noun collision with container images), Ark (overused).
 
@@ -24,7 +24,7 @@ Rejected names: Ferry (too generic, collisions), Stow (too cute, unclear), Manif
 
 ## Overview
 
-Users have large personal libraries — especially game capture videos of 50 MiB to several GiB — split across local NTFS volumes, Microsoft OneDrive, and Google Drive, with more providers coming. There is no unified inventory, no safe way to express “keep gaming clips on the local SSD *and* on whichever cloud has more free space,” and no tool that will actually move those bytes without (a) filling a disk that has only ~4 GiB free, (b) deleting the last copy, (c) corrupting a multi-gigabyte file on a dropped connection, or (d) accidentally creating an “anyone with the link” object.
+Users have large personal libraries split across internal NTFS volumes, removable disks, Microsoft OneDrive, and Google Drive, with more providers coming. There is no unified inventory, no safe way to express “keep these files on this disk *and* on whichever cloud has more free space,” or “use the USB drive only as a hop,” and no tool that will actually move those bytes without (a) filling a disk that has only ~4 GiB free, (b) deleting the last copy, (c) corrupting a multi-gigabyte file on a dropped connection, or (d) accidentally creating an “anyone with the link” object.
 
 Portage is a new standalone application (greenfield repo, not an extension of any existing scripts tree). It indexes every connected location into a local SQLite catalog using content-addressed identity, evaluates user placement policies, and produces an explicit, user-confirmed plan of copy / move / evict / shuttle operations. The planner is a space-aware sequencer: it will upload-and-evict to make room, then download, and it will refuse any plan that would drive local free space below a reserved staging budget at any step. The executor verifies checksums before it will consider a replica real, journals every mutation for crash resume, and never calls a public-sharing API.
 
@@ -105,7 +105,7 @@ Also in Release 1:
 | # | Decision | Rationale |
 | --- | --- | --- |
 | K1 | **Language: Rust** (edition 2021, stable toolchain). Not Python, not C#. | The product *is* the safety invariants: last-copy, checksums, crash journal, never-negative free space. Rust lets us put those in types and refuse to compile a delete that was not authorized by a `VerifiedReplicaGuard`. Multi-GB streaming hash and serial IO are systems work. A single `portage.exe` on Windows is the right UX. Official Drive/Graph SDKs are a liability here — they expose share-link helpers we must never call. Thin REST wrappers over the 8–10 endpoints we actually use are smaller and auditable. Python would iterate OAuth faster and lose on the planner/journal. C# is excellent for Graph and DPAPI but weaker at encoding planner invariants and at producing a small cross-OS CLI. |
-| K2 | **Repo `lundgren-greg/file-portage`, binary `portage`.** | Avoids Gentoo Portage collision; keeps the metaphor. |
+| K2 | **Repo `lundgren-greg/portage-app`, product/binary `portage`.** | Avoids Gentoo Portage and the niche “file-*” utility look. Keeps the metaphor. |
 | K3 | **SQLite catalog, WAL mode.** Default `%LOCALAPPDATA%\Portage\catalog.sqlite`. If `C:` free < 8 GiB, `init` **recommends** the largest non-overlay volume (`D:\PortageData`). Engine rejects overlay / Cloud Filter / free < 8 GiB `data_dir`. | Single-user, local-first, zero-admin, transactional, handles millions of rows, easy backup (copy one file). Postgres would be theater. A catalog on a full C: or DriveFS mount is unsafe. |
 | K4 | **Canonical content id is BLAKE3-256**, stored as `b3:<64 hex>`. Provider hashes (Google MD5, OneDrive SHA1 / QuickXor / SHA256) are *bindings*, not identity. On every transfer, hash BLAKE3 **and** the dest provider’s native algo in the same read; `UploadSession::finish` compares the computed native digest to the API-returned checksum. Evict STATs the dest and requires that stored native binding to match — never re-download a multi-GB object just to re-BLAKE3 it. | BLAKE3 is faster than SHA-256 on large videos and has a stable spec. Drive and Graph do not share a hash, so we cannot content-address cross-cloud without a local hash or a transfer. Index must not download cloud videos to obtain BLAKE3. Upload “verify” is native-digest match, not “BLAKE3 equals MD5.” |
 | K5 | **Two-phase identity: `suspect` then `verified`.** Every listed byte-file gets its own proto-blob (`content_id` NULL) unless a `(provider, algo, hex, size)` binding already points at a blob. Name+size matches are a `portage dups` grouping only and **never** merge blobs or count as last-copy. | Confirmed/verified = same `ContentId` after a local hash or a transfer we dual-hashed. Planner last-copy counts only `replicas.state = verified`. |
@@ -127,6 +127,7 @@ Also in Release 1:
 | K21 | **TUI after safety MVP.** `portage-tui` (ratatui) is PR 15. Color, hotkeys, configurability. It reviews plans and can *launch* apply; the user still types the plan id. PRs 1–13 are not blocked on it. | Fun surface without putting chrome in front of last-copy. |
 | K22 | **Catalog location: `init` recommends; NL may confirm; engine rejects unsafe dirs.** If `C:` free < 8 GiB, recommend the largest non-overlay volume (`D:\PortageData`). No silent move. Reject `data_dir` on a volume with free < 8 GiB or that is an overlay / Cloud Filter mount. | Catalog on a full C: or a DriveFS mount is a Sev-0 footgun. |
 | K23 | **Undo is reverse-plan + second typed plan id.** Never auto-start re-downloads. Refuse if the reverse plan would drop any blob to zero verified replicas or breach staging reserve. | Undo that silently re-downloads can fill the disk; undo that deletes a last copy is data loss. |
+| K24 | **Removable volumes are first-class locations.** An external / USB drive can be a **final** dest, a **shuttle** hop (staging when the internal disk cannot hold a transfer), or both. Identity is **volume serial**, not drive letter. Unplugged → fail closed (`VolumeOffline`); do not invent a last copy on a missing disk. | Internal SSDs are often the 4 GiB bottleneck. The portage *is* often an external disk. |
 
 ---
 
@@ -221,10 +222,10 @@ No daemon in v1. Incremental index is on-demand.
 
 ### Workspace and module tree
 
-New repo `file-portage` (nothing in `C:\Repos\Scripts` is part of this product):
+New repo `portage-app` (nothing in `C:\Repos\Scripts` is part of this product):
 
 ```text
-file-portage/
+portage-app/
 ├── Cargo.toml                          # workspace
 ├── Cargo.lock
 ├── rust-toolchain.toml                 # stable
@@ -501,7 +502,39 @@ if live - bytes_held_during_N < staging_reserve:
 
 Do **not** use `live < residual_during - slack` as the only gate. `residual_during` is already `start − size` for downloads/shuttles, so that comparison only fires after live has already fallen to the *end* of the op — too late to protect the reserve. Worked counter-example: after L2 evict, sim free is 7.50; Windows Update consumes 1.50 (live = 6.00). G1 (2.20) has `residual_during = 5.30`. The old gate `6.00 < 5.30 − 0.06` is false and would start the download; after G1+O1+G2 live would be **0.00**, below the 1.00 GiB reserve. Predicate (1) `6.00 + 0.06 >= 7.50` is false → pause. Phase 4 still asserts the *plan* troughs ≥ reserve; that does not replace this live check.
 
-**Staging dir** must live on a configured local volume (default: the volume with the most free space that is not a cloud overlay). Temp files for a dest on volume X **must** be created on volume X so rename is atomic. Cross-volume “rename” is a copy and is forbidden for finalize.
+**Staging dir** must live on a configured local volume. Default pick order: (1) a connected volume whose role includes `shuttle` with the most free space, (2) otherwise the non-overlay volume with the most free space. Temp files for a dest on volume X **must** be created on volume X so rename is atomic. Cross-volume “rename” is a copy and is forbidden for finalize.
+
+### Removable / external volumes
+
+External HDDs, USB SSDs, and other removable NTFS volumes are the same `local` provider with extra metadata. They are **not** a later provider type.
+
+```yaml
+providers:
+  - id: ext-media
+    type: local
+    root: "E:\\"                    # current mount; identity is volume serial
+    removable: true
+    roles: [shuttle, final]         # shuttle | final | both
+```
+
+| Role | Meaning |
+| --- | --- |
+| `final` | Eligible as `prefer_local` / `required` dest. Files may live here as a verified replica. |
+| `shuttle` | Eligible as the local hop for cloud-to-cloud and as `staging_dir` when internal usable space is too small. After the upload verifies, staging on this volume is deleted. |
+| both | Default for a user-added external disk. |
+
+Rules:
+
+1. **Identity = volume serial** (`GetVolumeInformation` serial). Drive letter changes (`E:` → `F:`) update `locations.root`; they do not create a second location.
+2. **Offline is fail-closed.** If a plan op’s src, dest, or staging volume is not mounted, `plan` / `apply` / `resume` stop with `Error::VolumeOffline` and the volume’s label/serial. Do not skip the op. Do not count an unplugged disk as a verified replica that can authorize a last-copy delete.
+3. **Shuttle on external does not make it a replica.** Bytes sitting in `.portage-staging` on `E:` are journal `Partial`, not `verified`.
+4. **Safe removal.** While any journal op is `Transferring` / `Verifying` on that serial, `doctor` and `status` say do not eject. Sudden unplug → resume rules (rehash tmp or restart); never evict a last copy because staging vanished.
+5. **Refuse overlays.** Same K6 checks. A DriveFS virtual letter is not an external disk.
+6. **Capacity.** `GetDiskFreeSpaceExW` on the volume root. Shuttle plans must keep *that* volume’s trough ≥ `staging_reserve` too.
+
+`portage provider add local --root E:\ --id ext-media --role both` records serial + roles. `portage capacity` shows internal vs removable separately.
+
+Worked case: internal `D:` has 4 GiB free (usable 3 GiB). File X is 8 GiB on Google, policy wants it on OneDrive only. `E:` (2 TiB USB, role `shuttle`) is mounted. Planner shuttles X via `E:\.portage-staging`, not via `D:`. If `E:` is unplugged, the plan is `Unsatisfiable` with “plug in ext-media (serial …) or free 8 GiB on D:”.
 
 ### Placement policies
 
@@ -962,7 +995,8 @@ Dropbox, S3-compatible (Backblaze B2, Wasabi, AWS), SMB/NAS, Microsoft 365 / Sha
 | `portage init` | Measure `C:` free. If `C:` < 8 GiB, **recommend** (do not silently use) the largest non-overlay volume as `data_dir` (e.g. `D:\PortageData`). Show the recommendation and wait for accept / `--data-dir`. Reject a chosen dir on a volume with free < 8 GiB or that is an overlay / Cloud Filter mount. Then write config, empty catalog, lock file. |
 | `portage provider add google-drive` | Open the system browser → user picks the Google account → approve → return to the CLI. Store token; write provider id into config. Consent copy must say why full `drive` is required (`drive.file` cannot see existing clips). |
 | `portage provider add onedrive` | Same browser PKCE flow for Microsoft personal account (`/me/drive` only). |
-| `portage provider add local --root D:\ --id local-d` | Register a volume |
+| `portage provider add local --root D:\ --id local-d` | Register a fixed volume (`roles: [final]` default) |
+| `portage provider add local --root E:\ --id ext-media --role both` | Register a removable volume as shuttle hop and/or final dest. Stores volume serial. |
 | `portage provider list` | Ids, kind, account, last index, capacity |
 | `portage index [--provider ID]` | Incremental scan + local hash of dirty LocalFull files |
 | `portage search QUERY` | Path / collection / mime substring, SQL LIKE + optional FTS later |
@@ -1719,11 +1753,11 @@ Do not implement these in Release 1. They do not take priority over R1 no-data-l
 
 ## PR Plan
 
-Incremental, each PR independently reviewable and mergeable, this repo → usable MVP (local + Google Drive + OneDrive + planner + confirmed apply). Implementation agents start at PR 1. The repo already exists: `lundgren-greg/file-portage`.
+Incremental, each PR independently reviewable and mergeable, this repo → usable MVP (local + Google Drive + OneDrive + planner + confirmed apply). Implementation agents start at PR 1. The repo already exists: `lundgren-greg/portage-app`.
 
 ### PR 1 — Repository skeleton and CLI shell
 
-- **Title:** `chore: bootstrap file-portage workspace, MIT license, CLI stub`
+- **Title:** `chore: bootstrap portage-app workspace, MIT license, CLI stub`
 - **Files/components:** `Cargo.toml` workspace (**eight** members listed, `portage-sim` may be a stub; do **not** add `portage-tui` / `portage-nl` yet), `LICENSE`, `README.md`, `SECURITY.md`, `.gitignore`, `rust-toolchain.toml`, `.github/workflows/ci.yml`, `crates/portage-core` (errors, `ByteSize`), `crates/portage-cli` (`portage --help`, `portage init`), `configs/examples/gaming-clips.yaml` (Archives-first policy as specified), `docs/design.md` (this document)
 - **Depends on:** none
 - **Description:** Compiles on Windows and Ubuntu. `portage init` measures `C:` free; if `< 8 GiB` prints a recommendation for the largest non-overlay volume (`D:\PortageData`) and does **not** silently relocate. Creates `%data_dir%/portage.lock`. CI runs `fmt`, `clippy -D warnings`, `test`. No network, no SQLite yet.
@@ -1747,7 +1781,7 @@ Incremental, each PR independently reviewable and mergeable, this repo → usabl
 - **Title:** `feat(local): NTFS walk with placeholder detection and sync-root exclusion`
 - **Files/components:** `crates/portage-providers/src/{traits,local/**,registry}.rs`, Windows `windows` crate usage, `portage-engine/src/index.rs` (local only), CLI `provider add local`, `index`, `capacity`
 - **Depends on:** PR 3
-- **Description:** Implements `Provider` for local disks. Detectors as specified: OneDrive `UserFolder`; DriveFS `DefaultMountPoint` / `Share` / `SyncTargets`; always exclude `%LOCALAPPDATA%\Google\DriveFS`; refuse `provider add local` when the root *is* an overlay or the volume is DriveFS/Cloud Filter; skip inner overlays when walking `C:\`. Placeholder files recorded as `hydration=placeholder` and never opened. Non-`LocalFull` is not a replica. `GetDiskFreeSpaceExW`. Linux/macOS: walk + `statvfs`, placeholder detection compiles to “always LocalFull.” `doctor` fails if OneDrive/DriveFS is installed and `overlay_roots` is empty. Integration test: temp dir of files, index, see rows.
+- **Description:** Implements `Provider` for local disks **including removable / USB volumes**. Detectors as specified: OneDrive `UserFolder`; DriveFS `DefaultMountPoint` / `Share` / `SyncTargets`; always exclude `%LOCALAPPDATA%\Google\DriveFS`; refuse `provider add local` when the root *is* an overlay or the volume is DriveFS/Cloud Filter; skip inner overlays when walking `C:\`. Record volume serial, bus/removable flag, and `roles: shuttle \| final \| both`. `GetDiskFreeSpaceExW`. Offline removable volumes fail closed (`VolumeOffline`) and do not count as last-copy. Placeholder files recorded as `hydration=placeholder` and never opened. Non-`LocalFull` is not a replica. Linux/macOS: walk + `statvfs`, placeholder detection compiles to “always LocalFull.” `doctor` fails if OneDrive/DriveFS is installed and `overlay_roots` is empty. Integration test: temp dir of files, index, see rows.
 
 ### PR 5 — Incremental local hash and duplicate listing
 
