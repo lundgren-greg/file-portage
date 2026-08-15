@@ -65,13 +65,13 @@ pub fn recommend(system: &Volume, others: &[Volume]) -> Recommendation {
 }
 
 /// Run `portage init`.
-pub fn run(args: &InitArgs) -> Result<()> {
+pub fn run(args: &InitArgs, verbose: bool) -> Result<()> {
     match &args.data_dir {
-        Some(dir) => init_at(dir),
+        Some(dir) => init_at(dir, verbose),
         None => {
             let system = system_volume()?;
             match recommend(&system, &other_volumes()) {
-                Recommendation::UseDefault => init_at(&default_data_dir()?),
+                Recommendation::UseDefault => init_at(&default_data_dir()?, verbose),
                 Recommendation::Recommend { root, free } => {
                     let suggested = root.join("PortageData");
                     println!(
@@ -94,8 +94,8 @@ pub fn run(args: &InitArgs) -> Result<()> {
 }
 
 /// Create the data dir, lock file, and config at an explicit location.
-fn init_at(dir: &Path) -> Result<()> {
-    let free = volume_free(existing_ancestor(dir))?;
+fn init_at(dir: &Path, verbose: bool) -> Result<()> {
+    let free = volume_free(dir)?;
     if free.bytes() < MIN_DATA_DIR_FREE {
         bail!(
             "refusing data_dir {}: volume has {} free, minimum is {}",
@@ -106,6 +106,10 @@ fn init_at(dir: &Path) -> Result<()> {
     }
 
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+
+    // From here on the data dir exists, so structured logging can start.
+    let _guard = portage_core::obs::init_tracing(dir, verbose)
+        .with_context(|| format!("initializing logging in {}", dir.display()))?;
 
     let lock = dir.join("portage.lock");
     if !lock.exists() {
@@ -124,6 +128,7 @@ fn init_at(dir: &Path) -> Result<()> {
     println!("created {}", lock.display());
     println!("data dir ready: {}", dir.display());
     println!("next: portage provider add local --root <drive> (PR 4)");
+    tracing::info!(data_dir = %dir.display(), free = free.bytes(), "data dir initialized");
     Ok(())
 }
 
@@ -134,7 +139,7 @@ fn example_config() -> &'static str {
 }
 
 /// Default data dir: `%LOCALAPPDATA%\Portage` or `~/.local/share/portage`.
-fn default_data_dir() -> Result<PathBuf> {
+pub fn default_data_dir() -> Result<PathBuf> {
     #[cfg(windows)]
     {
         let base = std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
@@ -160,7 +165,8 @@ fn existing_ancestor(dir: &Path) -> &Path {
 }
 
 /// Free space on the volume containing `path`.
-fn volume_free(path: &Path) -> Result<ByteSize> {
+pub fn volume_free(path: &Path) -> Result<ByteSize> {
+    let path = existing_ancestor(path);
     let free = fs2::available_space(path)
         .with_context(|| format!("measuring free space at {}", path.display()))?;
     Ok(ByteSize::new(free))
