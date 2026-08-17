@@ -53,7 +53,7 @@ The drive is identified by **volume serial**, not letter. If it is unplugged, an
 
 ## Status
 
-**Design approved. PRs 1–2 are on `main`.** An agent should execute the next numbered PR in [docs/design.md](docs/design.md) (see [PROJECT.md](PROJECT.md)). Feature checklist: [docs/FEATURES.md](docs/FEATURES.md). Wiki: [docs/wiki/README.md](docs/wiki/README.md) ([GitHub Wiki tab](https://github.com/lundgren-greg/portage-app/wiki)).
+**Paused 2026-08-17.** PRs 1–2 are on `main`. PR 3 (catalog) is open as [#12](https://github.com/lundgren-greg/portage-app/pull/12). After it merges, the next numbered PR is in [docs/design.md](docs/design.md) (see [PROJECT.md](PROJECT.md)). Feature checklist: [docs/FEATURES.md](docs/FEATURES.md). Wiki: [docs/wiki/README.md](docs/wiki/README.md) ([GitHub Wiki tab](https://github.com/lundgren-greg/portage-app/wiki)).
 
 ## Key features (Release 1)
 

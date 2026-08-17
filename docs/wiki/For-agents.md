@@ -13,7 +13,7 @@ You are continuing Portage. Do not invent a new architecture.
 
 Read `PROJECT.md` for the next numbered PR. Implement **that PR only** (`/next-pr`).
 
-PRs 1, 1.5, and 2 are on `main`. **PR 3** is the SQLite catalog (`portage doctor`). After it merges, implement **PR 4** unless `PROJECT.md` says otherwise.
+**Paused 2026-08-17.** PRs 1, 1.5, and 2 are on `main`. **PR 3** is implemented and waiting as [pull/12](https://github.com/lundgren-greg/portage-app/pull/12). After it merges, implement **PR 4** unless `PROJECT.md` says otherwise. Do not start PR 4 while #12 is open.
 
 Branch + pull request. Prefer not to commit on `main`.
 
